@@ -1,0 +1,73 @@
+name: Build Android JNI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+    paths:
+      - 'android/**'
+      - 'wallet/**'
+      - 'bvm/**'
+      - 'core/**'
+      - 'keykeeper/**'
+      - 'utility/**'
+      - 'mnemonic/**'
+      - 'node/**'
+
+env:
+  BUILD_TYPE: Release
+  ANDROID_SDK_VERSION: 25
+
+jobs:
+  build_android:
+    runs-on: ubuntu-22.04
+    strategy:
+      matrix:
+        abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Submodule update
+        run: git submodule update --init --recursive --jobs 4
+
+      - name: Create Build Environment
+        run: |
+          # Unset credential helper to avoid 403 on public repo clones
+          git config --global --unset-all http.https://github.com/.extraheader || true
+          git clone --depth=1 https://github.com/BeamMW/boost-android.git ${{runner.workspace}}/dependencies/boost_1_68-android
+          git clone --depth=1 https://github.com/BeamMW/openssl-android.git ${{runner.workspace}}/dependencies/Prebuilt-OpenSSL-Android
+          echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
+          echo "BOOST_ROOT_ANDROID=${{runner.workspace}}/dependencies/boost_1_68-android" >> $GITHUB_ENV
+          echo "OPENSSL_ROOT_DIR_ANDROID=${{runner.workspace}}/dependencies/Prebuilt-OpenSSL-Android" >> $GITHUB_ENV
+
+      - name: Configure CMake
+        run: |
+          export PATH=${{env.ANDROID_NDK_HOME}}:$PATH
+          cmake \
+            -DCMAKE_TOOLCHAIN_FILE=${{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake \
+            -DANDROID_NATIVE_API_LEVEL=${{env.ANDROID_SDK_VERSION}} \
+            -DANDROID_ABI=${{matrix.abi}} \
+            -DBEAM_IPFS_SUPPORT=Off \
+            -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
+            -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator" \
+            .
+
+      - name: Build wallet-jni
+        run: |
+          export PATH=${{env.ANDROID_NDK_HOME}}:$PATH
+          make wallet-jni -j$(nproc)
+
+      - name: Save version info
+        run: |
+          echo "BEAM_VERSION=$(cat beam_version.gen)" >> $GITHUB_ENV
+          rm beam_version.gen
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: libwallet-jni-${{matrix.abi}}-${{env.BEAM_VERSION}}
+          path: android/libwallet-jni.so
+          if-no-files-found: error
+          retention-days: 90
