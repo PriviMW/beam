@@ -1102,4 +1102,13 @@ void WalletModel::onAssetInfo(Asset::ID assetId, const WalletAsset& asset)
     env->DeleteLocalRef(jAssetInfo);
 }
 
+#ifdef BEAM_IPFS_SUPPORT
+void WalletModel::onIPFSStatus(bool running, const std::string& error, unsigned int peercnt)
+{
+    ipfsPeerCount.store(static_cast<int>(peercnt));
+    ipfsRunning.store(running);
+    BEAM_LOG_INFO() << "IPFS status: running=" << running << " peers=" << peercnt
+                    << (error.empty() ? "" : " error=" + error);
+}
+#endif
 

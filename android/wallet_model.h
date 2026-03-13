@@ -31,6 +31,11 @@ public:
     void callMyFunction();
     std::function<void()> myFunction;
 
+#ifdef BEAM_IPFS_SUPPORT
+    std::atomic<int> ipfsPeerCount{0};
+    std::atomic<bool> ipfsRunning{false};
+#endif
+
 private:
     void doFunction(const std::function<void()>& func);
     std::string getConfirmationProgress(beam::wallet::TxDescription transaction, uint32_t minConfirmations);
@@ -77,4 +82,7 @@ private:
     void onExchangeRates(const std::vector<beam::wallet::ExchangeRate>&) override;
     void onPublicAddress(const std::string& publicAddr) override;
     void onAssetInfo(beam::Asset::ID assetId, const beam::wallet::WalletAsset&) override;
+#ifdef BEAM_IPFS_SUPPORT
+    void onIPFSStatus(bool running, const std::string& error, unsigned int peercnt) override;
+#endif
 };

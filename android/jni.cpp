@@ -424,7 +424,7 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
         additionalTxCreators->emplace(TxType::PushTransaction, pushTxCreator);
         //additionalTxCreators->emplace(TxType::DexSimpleSwap, std::make_shared<DexTransaction::Creator>(walletDB));
 
-        
+
         walletModel->start(initNotifications(true), true, additionalTxCreators);
 
         #ifdef BEAM_IPFS_SUPPORT
@@ -435,9 +435,23 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             ipfsCfg.low_water = 20;
             ipfsCfg.high_water = 40;
             ipfsCfg.grace_period = 20;
+
+            // Provide bootstrap peers with IP addresses to bypass Go DNS
+            // resolution issues on Android. ipfs_imp.cpp skips defaults when
+            // these vectors are non-empty.
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting...";
+            BEAM_LOG_INFO() << "IPFS node starting with IP-based bootstrap peers...";
         }
         #endif
 
@@ -523,9 +537,23 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             ipfsCfg.low_water = 20;
             ipfsCfg.high_water = 40;
             ipfsCfg.grace_period = 20;
+
+            // Provide bootstrap peers with IP addresses to bypass Go DNS
+            // resolution issues on Android. ipfs_imp.cpp skips defaults when
+            // these vectors are non-empty.
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
+            ipfsCfg.peering.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting...";
+            BEAM_LOG_INFO() << "IPFS node starting with IP-based bootstrap peers...";
         }
         #endif
 
@@ -595,6 +623,19 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(getDefaultPeers)(JNIEnv *env, 
     }
 
     return peersArray;
+}
+
+JNIEXPORT jint JNICALL BEAM_JAVA_API_INTERFACE(getIPFSPeerCount)(JNIEnv *env, jobject thiz)
+{
+#ifdef BEAM_IPFS_SUPPORT
+    if (walletModel)
+    {
+        return static_cast<jint>(walletModel->ipfsPeerCount.load());
+    }
+    return -1;
+#else
+    return -2;
+#endif
 }
 
 JNIEXPORT jboolean JNICALL BEAM_JAVA_API_INTERFACE(checkReceiverAddress)(JNIEnv *env, jobject thiz, jstring address)
