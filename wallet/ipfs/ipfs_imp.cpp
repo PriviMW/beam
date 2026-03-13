@@ -258,22 +258,63 @@ namespace beam::wallet::imp
             return;
         }
 
+#ifdef __ANDROID__
+        // Android: bypass Boost.Context coroutines — Go's signal handlers conflict
+        // with coroutine stack switching. Use direct callbacks instead.
+        {
+            std::scoped_lock lock(_mutex);
+            if (!_thread.joinable()) {
+                AnyThreaad_retErr(std::move(err), "Unexpected add call. IPFS is not started");
+                return;
+            }
+            _ios.post([this, data = std::move(data), pin, res = std::move(res), err = std::move(err)]() mutable {
+                auto cancel = std::make_shared<std::function<void()>>();
+                _node->add(&data[0], data.size(), pin, *cancel,
+                    std::function<void(boost::system::error_code, std::string)>(
+                        [this, res = std::move(res), err = std::move(err), cancel](
+                            boost::system::error_code ec, std::string cid) mutable {
+                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
+                            else    { AnyThreaad_retVal(std::move(res), std::move(cid)); }
+                        }));
+            });
+        }
+#else
         call_ipfs(timeout, std::move(res), std::move(err),[this, data = std::move(data), pin]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> auto
         {
             return _node->add(&data[0], data.size(), pin, cancel, std::move(yield));
         });
+#endif
     }
 
     void IPFSService::AnyThread_hash(std::vector<uint8_t>&& data, uint32_t timeout, std::function<void (std::string&&)>&& res, Err&& err)
     {
-        BEAM_LOG_DEBUG() << "IPFS AnyThread_hash: entry, data.size=" << data.size() << " timeout=" << timeout;
         if (data.empty())
         {
             AnyThreaad_retErr(std::move(err), "Empty data buffer cannot be hashed");
             return;
         }
 
+#ifdef __ANDROID__
+        {
+            std::scoped_lock lock(_mutex);
+            if (!_thread.joinable()) {
+                AnyThreaad_retErr(std::move(err), "Unexpected hash call. IPFS is not started");
+                return;
+            }
+            _ios.post([this, data = std::move(data), res = std::move(res), err = std::move(err)]() mutable {
+                auto cancel = std::make_shared<std::function<void()>>();
+                _node->calc_cid(&data[0], data.size(), *cancel,
+                    std::function<void(boost::system::error_code, std::string)>(
+                        [this, res = std::move(res), err = std::move(err), cancel](
+                            boost::system::error_code ec, std::string cid) mutable {
+                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
+                            else    { AnyThreaad_retVal(std::move(res), std::move(cid)); }
+                        }));
+            });
+        }
+#else
+        BEAM_LOG_DEBUG() << "IPFS AnyThread_hash: entry, data.size=" << data.size() << " timeout=" << timeout;
         BEAM_LOG_DEBUG() << "IPFS AnyThread_hash: _node=" << (void*)_node.get();
         call_ipfs(timeout, std::move(res), std::move(err),[this, data = std::move(data)]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> auto
@@ -283,6 +324,7 @@ namespace beam::wallet::imp
             BEAM_LOG_DEBUG() << "IPFS AnyThread_hash lambda: calc_cid returned";
             return result;
         });
+#endif
     }
 
     void IPFSService::AnyThread_get(const std::string& hash, uint32_t timeout, std::function<void (std::vector<uint8_t>&&)>&& res, Err&& err)
@@ -293,11 +335,31 @@ namespace beam::wallet::imp
             return;
         }
 
+#ifdef __ANDROID__
+        {
+            std::scoped_lock lock(_mutex);
+            if (!_thread.joinable()) {
+                AnyThreaad_retErr(std::move(err), "Unexpected get call. IPFS is not started");
+                return;
+            }
+            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+                auto cancel = std::make_shared<std::function<void()>>();
+                _node->cat(hash, *cancel,
+                    std::function<void(boost::system::error_code, std::vector<uint8_t>)>(
+                        [this, res = std::move(res), err = std::move(err), cancel](
+                            boost::system::error_code ec, std::vector<uint8_t> data) mutable {
+                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
+                            else    { AnyThreaad_retVal(std::move(res), std::move(data)); }
+                        }));
+            });
+        }
+#else
         call_ipfs(timeout, std::move(res), std::move(err), [this, hash]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> auto
         {
             return _node->cat(hash, cancel, std::move(yield));
         });
+#endif
     }
 
     void IPFSService::AnyThread_pin(const std::string& hash, uint32_t timeout, std::function<void ()>&& res, Err&& err)
@@ -308,12 +370,32 @@ namespace beam::wallet::imp
             return;
         }
 
+#ifdef __ANDROID__
+        {
+            std::scoped_lock lock(_mutex);
+            if (!_thread.joinable()) {
+                AnyThreaad_retErr(std::move(err), "Unexpected pin call. IPFS is not started");
+                return;
+            }
+            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+                auto cancel = std::make_shared<std::function<void()>>();
+                _node->pin(hash, *cancel,
+                    std::function<void(boost::system::error_code)>(
+                        [this, res = std::move(res), err = std::move(err), cancel](
+                            boost::system::error_code ec) mutable {
+                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
+                            else    { AnyThreaad_retToClient(std::move(res)); }
+                        }));
+            });
+        }
+#else
         call_ipfs(timeout, std::move(res), std::move(err), [this, hash]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> JustVoid
         {
             _node->pin(hash, cancel, std::move(yield));
             return JustVoid{};
         });
+#endif
     }
 
     void IPFSService::AnyThread_unpin(const std::string& hash, std::function<void ()>&& res, Err&& err)
@@ -324,22 +406,62 @@ namespace beam::wallet::imp
             return;
         }
 
+#ifdef __ANDROID__
+        {
+            std::scoped_lock lock(_mutex);
+            if (!_thread.joinable()) {
+                AnyThreaad_retErr(std::move(err), "Unexpected unpin call. IPFS is not started");
+                return;
+            }
+            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+                auto cancel = std::make_shared<std::function<void()>>();
+                _node->unpin(hash, *cancel,
+                    std::function<void(boost::system::error_code)>(
+                        [this, res = std::move(res), err = std::move(err), cancel](
+                            boost::system::error_code ec) mutable {
+                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
+                            else    { AnyThreaad_retToClient(std::move(res)); }
+                        }));
+            });
+        }
+#else
         call_ipfs(0, std::move(res), std::move(err), [this, hash]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> JustVoid
         {
             _node->unpin(hash, cancel, std::move(yield));
             return JustVoid{};
         });
+#endif
     }
 
     void IPFSService::AnyThread_gc(uint32_t timeout, std::function<void ()>&& res, Err&& err)
     {
+#ifdef __ANDROID__
+        {
+            std::scoped_lock lock(_mutex);
+            if (!_thread.joinable()) {
+                AnyThreaad_retErr(std::move(err), "Unexpected gc call. IPFS is not started");
+                return;
+            }
+            _ios.post([this, res = std::move(res), err = std::move(err)]() mutable {
+                auto cancel = std::make_shared<std::function<void()>>();
+                _node->gc(*cancel,
+                    std::function<void(boost::system::error_code)>(
+                        [this, res = std::move(res), err = std::move(err), cancel](
+                            boost::system::error_code ec) mutable {
+                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
+                            else    { AnyThreaad_retToClient(std::move(res)); }
+                        }));
+            });
+        }
+#else
         call_ipfs(timeout, std::move(res), std::move(err), [this]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> JustVoid
         {
             _node->gc(cancel, std::move(yield));
             return JustVoid{};
         });
+#endif
     }
 
     void IPFSService::AnyThreaad_retToClient(std::function<void()>&& what)
