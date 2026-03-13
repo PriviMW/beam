@@ -17,14 +17,25 @@ set(SRC
 )
 
 add_library(${TARGET_NAME} SHARED ${SRC})
-target_link_libraries(${TARGET_NAME}
-    PRIVATE
-        wallet_client_no_ipfs
-        wallet_api_no_ipfs
-        utility 
-        node 
-        mnemonic
-)
+if(BEAM_IPFS_SUPPORT)
+    target_link_libraries(${TARGET_NAME}
+        PRIVATE
+            wallet_client
+            wallet_api
+            utility
+            node
+            mnemonic
+    )
+else()
+    target_link_libraries(${TARGET_NAME}
+        PRIVATE
+            wallet_client_no_ipfs
+            wallet_api_no_ipfs
+            utility
+            node
+            mnemonic
+    )
+endif()
 
 if(ANDROID)
 	target_link_libraries(${TARGET_NAME} PRIVATE android log)
