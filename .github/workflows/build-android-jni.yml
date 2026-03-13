@@ -83,9 +83,11 @@ jobs:
           OBJDIR="$TMPDIR/obj"
           mkdir -p $OBJDIR
 
-          CXX_FLAGS="-O2 -std=c++11 -fPIC -DANDROID -DNDEBUG \
+          CXX_FLAGS="-O2 -std=c++17 -fPIC -DANDROID -DNDEBUG \
             -DBOOST_CONTEXT_SOURCE -DBOOST_COROUTINES_SOURCE \
             -DBOOST_COROUTINES_NO_DEPRECATION_WARNING \
+            -DBOOST_NO_CXX98_FUNCTION_BASE \
+            -Wno-deprecated-declarations \
             -I${BOOST_INC} \
             -I$TMPDIR/context/include \
             -I$TMPDIR/coroutine/include"
