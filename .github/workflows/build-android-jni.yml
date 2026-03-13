@@ -25,6 +25,23 @@ jobs:
     strategy:
       matrix:
         abi: [arm64-v8a, armeabi-v7a, x86, x86_64]
+        include:
+          - abi: arm64-v8a
+            ndk_triple: aarch64-linux-android
+            boost_tag: a64
+            ctx_asm_arch: arm64
+          - abi: armeabi-v7a
+            ndk_triple: armv7a-linux-androideabi
+            boost_tag: a32
+            ctx_asm_arch: arm
+          - abi: x86
+            ndk_triple: i686-linux-android
+            boost_tag: x32
+            ctx_asm_arch: i386
+          - abi: x86_64
+            ndk_triple: x86_64-linux-android
+            boost_tag: x64
+            ctx_asm_arch: x86_64
 
     steps:
       - uses: actions/checkout@v4
@@ -43,6 +60,88 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
           echo "BOOST_ROOT_ANDROID=${{runner.workspace}}/dependencies/boost_1_68-android" >> $GITHUB_ENV
           echo "OPENSSL_ROOT_DIR_ANDROID=${{runner.workspace}}/dependencies/Prebuilt-OpenSSL-Android" >> $GITHUB_ENV
+
+      - name: Build Boost.Context + Boost.Coroutine for Android
+        run: |
+          BOOST_ROOT="${{env.BOOST_ROOT_ANDROID}}"
+          BOOST_INC="${BOOST_ROOT}/include"
+          BOOST_LIB="${BOOST_ROOT}/libs/${{matrix.abi}}"
+          NDK_BIN="${{env.ANDROID_NDK_HOME}}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CC="${NDK_BIN}/${{matrix.ndk_triple}}${{env.ANDROID_SDK_VERSION}}-clang"
+          CXX="${NDK_BIN}/${{matrix.ndk_triple}}${{env.ANDROID_SDK_VERSION}}-clang++"
+          AR="${NDK_BIN}/llvm-ar"
+          SUFFIX="-clang-mt-${{matrix.boost_tag}}-1_68.a"
+          TMPDIR=$(mktemp -d)
+
+          # Download Boost 1.68 source (context + coroutine only)
+          cd $TMPDIR
+          git clone --depth=1 --branch=boost-1.68.0 https://github.com/boostorg/context.git
+          git clone --depth=1 --branch=boost-1.68.0 https://github.com/boostorg/coroutine.git
+
+          CTX_SRC="$TMPDIR/context/src"
+          COR_SRC="$TMPDIR/coroutine/src"
+          OBJDIR="$TMPDIR/obj"
+          mkdir -p $OBJDIR
+
+          CXX_FLAGS="-O2 -std=c++11 -fPIC -DANDROID -DNDEBUG \
+            -DBOOST_CONTEXT_SOURCE -DBOOST_COROUTINES_SOURCE \
+            -DBOOST_COROUTINES_NO_DEPRECATION_WARNING \
+            -I${BOOST_INC}"
+
+          # Determine assembly ABI suffix for context asm files
+          if [ "${{matrix.ctx_asm_arch}}" = "arm64" ]; then
+            ASM_ABI="aapcs"
+          elif [ "${{matrix.ctx_asm_arch}}" = "arm" ]; then
+            ASM_ABI="aapcs"
+          elif [ "${{matrix.ctx_asm_arch}}" = "i386" ]; then
+            ASM_ABI="sysv"
+          elif [ "${{matrix.ctx_asm_arch}}" = "x86_64" ]; then
+            ASM_ABI="sysv"
+          fi
+
+          ASM_PREFIX="${CTX_SRC}/asm"
+          ASM_ARCH="${{matrix.ctx_asm_arch}}"
+
+          # Build Boost.Context
+          echo "=== Building Boost.Context for ${{matrix.abi}} ==="
+
+          # Assemble context switching routines
+          $CC -c $CXX_FLAGS \
+            ${ASM_PREFIX}/jump_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
+            -o $OBJDIR/jump.o
+          $CC -c $CXX_FLAGS \
+            ${ASM_PREFIX}/make_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
+            -o $OBJDIR/make.o
+          $CC -c $CXX_FLAGS \
+            ${ASM_PREFIX}/ontop_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
+            -o $OBJDIR/ontop.o
+
+          # Compile C++ sources
+          $CXX -c $CXX_FLAGS ${CTX_SRC}/execution_context.cpp -o $OBJDIR/execution_context.o
+          $CXX -c $CXX_FLAGS ${CTX_SRC}/continuation.cpp -o $OBJDIR/continuation.o
+          $CXX -c $CXX_FLAGS ${CTX_SRC}/fiber.cpp -o $OBJDIR/fiber.o
+          $CXX -c $CXX_FLAGS ${CTX_SRC}/posix/stack_traits.cpp -o $OBJDIR/ctx_stack_traits.o
+
+          $AR rcs ${BOOST_LIB}/libboost_context${SUFFIX} \
+            $OBJDIR/jump.o $OBJDIR/make.o $OBJDIR/ontop.o \
+            $OBJDIR/execution_context.o $OBJDIR/continuation.o \
+            $OBJDIR/fiber.o $OBJDIR/ctx_stack_traits.o
+
+          echo "Built: ${BOOST_LIB}/libboost_context${SUFFIX}"
+
+          # Build Boost.Coroutine
+          echo "=== Building Boost.Coroutine for ${{matrix.abi}} ==="
+
+          $CXX -c $CXX_FLAGS ${COR_SRC}/exceptions.cpp -o $OBJDIR/cor_exceptions.o
+          $CXX -c $CXX_FLAGS ${COR_SRC}/detail/coroutine_context.cpp -o $OBJDIR/coroutine_context.o
+          $CXX -c $CXX_FLAGS ${COR_SRC}/posix/stack_traits.cpp -o $OBJDIR/cor_stack_traits.o
+
+          $AR rcs ${BOOST_LIB}/libboost_coroutine${SUFFIX} \
+            $OBJDIR/cor_exceptions.o $OBJDIR/coroutine_context.o \
+            $OBJDIR/cor_stack_traits.o
+
+          echo "Built: ${BOOST_LIB}/libboost_coroutine${SUFFIX}"
+          ls -la ${BOOST_LIB}/libboost_co*
 
       - name: Configure CMake
         run: |
