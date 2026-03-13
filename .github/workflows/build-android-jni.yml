@@ -90,6 +90,7 @@ jobs:
             -DBOOST_ERROR_CODE_HEADER_ONLY \
             -D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION \
             -Wno-deprecated-declarations \
+            -Wno-enum-constexpr-conversion \
             -I${BOOST_INC} \
             -I$TMPDIR/context/include \
             -I$TMPDIR/coroutine/include"
@@ -155,7 +156,7 @@ jobs:
             -DANDROID_ABI=${{matrix.abi}} \
             -DBEAM_IPFS_SUPPORT=On \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator -DBOOST_COROUTINES_NO_DEPRECATION_WARNING" \
+            -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator -Wno-enum-constexpr-conversion -DBOOST_COROUTINES_NO_DEPRECATION_WARNING" \
             .
 
       - name: Build wallet-jni
