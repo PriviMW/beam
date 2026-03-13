@@ -25,6 +25,7 @@ if(BEAM_IPFS_SUPPORT)
             utility
             node
             mnemonic
+            Boost::thread
     )
 else()
     target_link_libraries(${TARGET_NAME}

@@ -9,6 +9,7 @@ target_link_libraries(wallet_ipfs
     PUBLIC
         Boost::boost
         Boost::coroutine
+        Boost::context
     PRIVATE
         utility
         asio-ipfs
