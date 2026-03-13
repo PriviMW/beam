@@ -60,7 +60,7 @@ namespace beam::wallet::imp
         //
         boost::system::error_code ec;
         const auto canonicalPath = boost::filesystem::weakly_canonical(fullPath, ec);
-        if (ec.failed())
+        if (ec)
         {
             throw boost::filesystem::filesystem_error("IPFS service failed to form canonical path", ec);
         }
