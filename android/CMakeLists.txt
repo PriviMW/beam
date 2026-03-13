@@ -38,6 +38,12 @@ else()
 endif()
 
 if(ANDROID)
+	# -Bsymbolic: Go c-archive uses PC-relative relocations (R_AARCH64_ADR_PREL_PG_HI21)
+	# for internal symbols. lld rejects these in shared libraries unless we tell it that
+	# symbols bind locally (no interposition). Required for Go IPFS bindings.
+	if(BEAM_IPFS_SUPPORT)
+		target_link_options(${TARGET_NAME} PRIVATE "LINKER:-Bsymbolic")
+	endif()
 	target_link_libraries(${TARGET_NAME} PRIVATE android log)
 else()
 	add_subdirectory(unittests)
