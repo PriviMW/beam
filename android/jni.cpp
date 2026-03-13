@@ -27,6 +27,10 @@
 #include "utility/string_helpers.h"
 #include "mnemonic/mnemonic.h"
 
+#ifdef BEAM_IPFS_SUPPORT
+#include "3rdparty/asio-ipfs/include/ipfs_config.h"
+#endif
+
 #include <boost/filesystem.hpp>
 #include <boost/algorithm/string/trim.hpp>
 #include <jni.h>
@@ -423,6 +427,20 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
         
         walletModel->start(initNotifications(true), true, additionalTxCreators);
 
+        #ifdef BEAM_IPFS_SUPPORT
+        {
+            asio_ipfs::config ipfsCfg(asio_ipfs::config::Mode::Desktop);
+            ipfsCfg.repo_root = appData + "/ipfs-repo";
+            ipfsCfg.storage_max = "1GB";
+            ipfsCfg.low_water = 20;
+            ipfsCfg.high_water = 40;
+            ipfsCfg.grace_period = 20;
+            walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
+            walletModel->getAsync()->startIPFSNode();
+            BEAM_LOG_INFO() << "IPFS node starting...";
+        }
+        #endif
+
         webAPICreator = make_unique<WebAPICreator>();
 
         return walletObj;
@@ -496,6 +514,20 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
         walletModel->getAsync()->enableBodyRequests(enableBodyRequests);
 
         walletModel->start(initNotifications(true), true, additionalTxCreators);
+
+        #ifdef BEAM_IPFS_SUPPORT
+        {
+            asio_ipfs::config ipfsCfg(asio_ipfs::config::Mode::Desktop);
+            ipfsCfg.repo_root = appData + "/ipfs-repo";
+            ipfsCfg.storage_max = "1GB";
+            ipfsCfg.low_water = 20;
+            ipfsCfg.high_water = 40;
+            ipfsCfg.grace_period = 20;
+            walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
+            walletModel->getAsync()->startIPFSNode();
+            BEAM_LOG_INFO() << "IPFS node starting...";
+        }
+        #endif
 
         webAPICreator = make_unique<WebAPICreator>();
 
