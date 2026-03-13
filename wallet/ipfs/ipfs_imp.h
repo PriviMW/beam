@@ -84,6 +84,7 @@ namespace beam::wallet::imp
                 );
             }
 
+            BEAM_LOG_DEBUG() << "IPFS call_ipfs: spawning coroutine on _ios";
             boost::asio::spawn(_ios, [this,
                                        err = std::move(err),
                                        deadline = std::move(deadline),
@@ -93,6 +94,7 @@ namespace beam::wallet::imp
                 (boost::asio::yield_context yield) mutable {
                     try
                     {
+                        BEAM_LOG_DEBUG() << "IPFS call_ipfs: coroutine started";
                         std::function<void ()> cancel;
                         if (deadline)
                         {
@@ -108,7 +110,9 @@ namespace beam::wallet::imp
                             });
                         }
 
+                        BEAM_LOG_DEBUG() << "IPFS call_ipfs: calling action (node->calc_cid etc)";
                         auto result = action(yield, cancel);
+                        BEAM_LOG_DEBUG() << "IPFS call_ipfs: action completed, returning result";
                         if (deadline)
                         {
                             deadline->cancel();
@@ -117,6 +121,7 @@ namespace beam::wallet::imp
                     }
                     catch(const boost::system::system_error& se)
                     {
+                        BEAM_LOG_ERROR() << "IPFS call_ipfs: exception: " << err2str(se);
                         AnyThreaad_retErr(std::move(err), err2str(se));
                     }
                 }

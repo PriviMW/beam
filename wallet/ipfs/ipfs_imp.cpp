@@ -267,16 +267,21 @@ namespace beam::wallet::imp
 
     void IPFSService::AnyThread_hash(std::vector<uint8_t>&& data, uint32_t timeout, std::function<void (std::string&&)>&& res, Err&& err)
     {
+        BEAM_LOG_DEBUG() << "IPFS AnyThread_hash: entry, data.size=" << data.size() << " timeout=" << timeout;
         if (data.empty())
         {
             AnyThreaad_retErr(std::move(err), "Empty data buffer cannot be hashed");
             return;
         }
 
+        BEAM_LOG_DEBUG() << "IPFS AnyThread_hash: _node=" << (void*)_node.get();
         call_ipfs(timeout, std::move(res), std::move(err),[this, data = std::move(data)]
         (boost::asio::yield_context yield, std::function<void()>& cancel) -> auto
         {
-            return _node->calc_cid(&data[0], data.size(), cancel, std::move(yield));
+            BEAM_LOG_DEBUG() << "IPFS AnyThread_hash lambda: _node=" << (void*)_node.get() << " data.size=" << data.size();
+            auto result = _node->calc_cid(&data[0], data.size(), cancel, std::move(yield));
+            BEAM_LOG_DEBUG() << "IPFS AnyThread_hash lambda: calc_cid returned";
+            return result;
         });
     }
 
@@ -339,6 +344,8 @@ namespace beam::wallet::imp
 
     void IPFSService::AnyThreaad_retToClient(std::function<void()>&& what)
     {
+        BEAM_LOG_DEBUG() << "IPFS AnyThreaad_retToClient: _handler=" << (void*)_handler.get();
         _handler->AnyThread_pushToClient(std::move(what));
+        BEAM_LOG_DEBUG() << "IPFS AnyThreaad_retToClient: done";
     }
 }
