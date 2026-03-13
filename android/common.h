@@ -53,21 +53,28 @@ JNIEnv* Android_JNI_getEnv(void);
 
 struct JString
 {
-    JString(JNIEnv *envVal, jstring nameVal)
+    // ownsRefVal: true if JString owns the jstring local reference
+    //   (e.g., from GetObjectField). false for JNI method parameters
+    //   which are auto-freed by the JVM and must NOT be explicitly deleted
+    //   (Android checkJNI in debug builds treats this as fatal).
+    JString(JNIEnv *envVal, jstring nameVal, bool ownsRefVal = false)
         : env(envVal)
         , name(nameVal)
         , isCopy(JNI_FALSE)
+        , ownsRef(ownsRefVal)
         , data(env->GetStringUTFChars(name, &isCopy))
     {
     }
 
     ~JString()
     {
-        if (isCopy == JNI_TRUE)
+        // ReleaseStringUTFChars must ALWAYS be called regardless of isCopy
+        // (JNI spec: isCopy is informational only, release is mandatory)
+        env->ReleaseStringUTFChars(name, data);
+        if (ownsRef)
         {
-            env->ReleaseStringUTFChars(name, data);
+            env->DeleteLocalRef(name);
         }
-        env->DeleteLocalRef(name);
     }
 
     std::string value() const
@@ -78,6 +85,7 @@ private:
     JNIEnv* env;
     jstring name;
     jboolean isCopy;
+    bool ownsRef;
     const char* data;
 };
 
@@ -139,7 +147,7 @@ inline std::string getStringField(JNIEnv *env, jclass clazz, jobject obj, const 
 {
     jfieldID fieldId = env->GetFieldID(clazz, name, "Ljava/lang/String;");
 
-    return JString(env, (jstring)env->GetObjectField(obj, fieldId)).value();
+    return JString(env, (jstring)env->GetObjectField(obj, fieldId), true).value();
 }
 
 inline jlong getLongField(JNIEnv *env, jclass clazz, jobject obj, const char* name)
