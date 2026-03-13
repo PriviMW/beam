@@ -86,6 +86,7 @@ jobs:
           CXX_FLAGS="-O2 -std=c++14 -fPIC -DANDROID -DNDEBUG \
             -DBOOST_CONTEXT_SOURCE -DBOOST_COROUTINES_SOURCE \
             -DBOOST_COROUTINES_NO_DEPRECATION_WARNING \
+            -DBOOST_MPL_CFG_NO_NESTED_VALUE_ARITHMETIC \
             -Wno-deprecated-declarations \
             -I${BOOST_INC} \
             -I$TMPDIR/context/include \
