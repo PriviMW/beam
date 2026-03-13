@@ -87,6 +87,8 @@ jobs:
             -DBOOST_CONTEXT_SOURCE -DBOOST_COROUTINES_SOURCE \
             -DBOOST_COROUTINES_NO_DEPRECATION_WARNING \
             -DBOOST_NO_CXX98_FUNCTION_BASE \
+            -DBOOST_ERROR_CODE_HEADER_ONLY \
+            -D_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION \
             -Wno-deprecated-declarations \
             -I${BOOST_INC} \
             -I$TMPDIR/context/include \
@@ -120,14 +122,13 @@ jobs:
             ${ASM_PREFIX}/ontop_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
             -o $OBJDIR/ontop.o
 
-          # Compile C++ sources (only execution_context + stack_traits needed
-          # for Boost.Coroutine; continuation/fiber are newer APIs not used)
-          $CXX -c $CXX_FLAGS ${CTX_SRC}/execution_context.cpp -o $OBJDIR/execution_context.o
+          # Only stack_traits needed — Boost.Coroutine uses fcontext
+          # assembly directly, not the C++ execution_context class
           $CXX -c $CXX_FLAGS ${CTX_SRC}/posix/stack_traits.cpp -o $OBJDIR/ctx_stack_traits.o
 
           $AR rcs ${BOOST_LIB}/libboost_context${SUFFIX} \
             $OBJDIR/jump.o $OBJDIR/make.o $OBJDIR/ontop.o \
-            $OBJDIR/execution_context.o $OBJDIR/ctx_stack_traits.o
+            $OBJDIR/ctx_stack_traits.o
 
           echo "Built: ${BOOST_LIB}/libboost_context${SUFFIX}"
 
