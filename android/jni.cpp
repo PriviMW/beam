@@ -29,6 +29,8 @@
 
 #ifdef BEAM_IPFS_SUPPORT
 #include "3rdparty/asio-ipfs/include/ipfs_config.h"
+#include <netdb.h>
+#include <arpa/inet.h>
 #endif
 
 #include <boost/filesystem.hpp>
@@ -85,6 +87,64 @@ namespace
     static std::string lastWalledId("");
 
     static unique_ptr<WebAPICreator> webAPICreator;
+
+#ifdef BEAM_IPFS_SUPPORT
+    // Beam mainnet IPFS bootstrap peers — hostname, fallback IP, port, libp2p peer ID
+    struct IpfsPeer {
+        const char* hostname;
+        const char* fallbackIp;
+        int port;
+        const char* peerId;
+    };
+
+    static const IpfsPeer g_BeamIpfsPeers[] = {
+        {"eu-node01.mainnet.beam.mw", "188.245.67.33", 38041, "12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND"},
+        {"eu-node02.mainnet.beam.mw", "188.245.67.35", 38041, "12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc"},
+        {"eu-node03.mainnet.beam.mw", "188.245.67.34", 38041, "12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt"},
+        {"eu-node04.mainnet.beam.mw", "188.245.67.32", 38041, "12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ"},
+    };
+
+    // Resolve hostname via bionic getaddrinfo (works on Android, unlike Go's resolver).
+    // Returns resolved IP string, or fallbackIp if DNS fails.
+    std::string resolveHostname(const char* hostname, const char* fallbackIp)
+    {
+        struct addrinfo hints = {};
+        hints.ai_family = AF_INET;  // IPv4
+        hints.ai_socktype = SOCK_STREAM;
+
+        struct addrinfo* result = nullptr;
+        int err = getaddrinfo(hostname, nullptr, &hints, &result);
+        if (err == 0 && result) {
+            char ipStr[INET_ADDRSTRLEN];
+            auto* addr = reinterpret_cast<struct sockaddr_in*>(result->ai_addr);
+            inet_ntop(AF_INET, &addr->sin_addr, ipStr, sizeof(ipStr));
+            freeaddrinfo(result);
+            BEAM_LOG_INFO() << "IPFS DNS: " << hostname << " -> " << ipStr;
+            return std::string(ipStr);
+        }
+        if (result) freeaddrinfo(result);
+        BEAM_LOG_WARNING() << "IPFS DNS failed for " << hostname << " (err=" << err
+                           << "), using fallback " << fallbackIp;
+        return std::string(fallbackIp);
+    }
+
+    // Build multiaddr string: /ip4/<ip>/tcp/<port>/p2p/<peerId>
+    std::string buildMultiaddr(const std::string& ip, int port, const char* peerId)
+    {
+        return "/ip4/" + ip + "/tcp/" + std::to_string(port) + "/p2p/" + peerId;
+    }
+
+    // Populate IPFS config with resolved bootstrap + peering peers
+    void populateIpfsPeers(asio_ipfs::config& cfg)
+    {
+        for (const auto& peer : g_BeamIpfsPeers) {
+            std::string ip = resolveHostname(peer.hostname, peer.fallbackIp);
+            std::string addr = buildMultiaddr(ip, peer.port, peer.peerId);
+            cfg.bootstrap.emplace_back(addr);
+            cfg.peering.emplace_back(addr);
+        }
+    }
+#endif
 
     void initLogger(const string& appData, const string& appVersion)
     {
@@ -436,22 +496,13 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             ipfsCfg.high_water = 40;
             ipfsCfg.grace_period = 20;
 
-            // Provide bootstrap peers with IP addresses to bypass Go DNS
-            // resolution issues on Android. ipfs_imp.cpp skips defaults when
-            // these vectors are non-empty.
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
-
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+            // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
+            // Falls back to hardcoded IPs if DNS fails.
+            populateIpfsPeers(ipfsCfg);
 
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting with IP-based bootstrap peers...";
+            BEAM_LOG_INFO() << "IPFS node starting with resolved bootstrap peers...";
         }
         #endif
 
@@ -538,22 +589,13 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             ipfsCfg.high_water = 40;
             ipfsCfg.grace_period = 20;
 
-            // Provide bootstrap peers with IP addresses to bypass Go DNS
-            // resolution issues on Android. ipfs_imp.cpp skips defaults when
-            // these vectors are non-empty.
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
-            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
-
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
-            ipfsCfg.peering.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+            // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
+            // Falls back to hardcoded IPs if DNS fails.
+            populateIpfsPeers(ipfsCfg);
 
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting with IP-based bootstrap peers...";
+            BEAM_LOG_INFO() << "IPFS node starting with resolved bootstrap peers...";
         }
         #endif
 
