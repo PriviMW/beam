@@ -86,7 +86,9 @@ jobs:
           CXX_FLAGS="-O2 -std=c++11 -fPIC -DANDROID -DNDEBUG \
             -DBOOST_CONTEXT_SOURCE -DBOOST_COROUTINES_SOURCE \
             -DBOOST_COROUTINES_NO_DEPRECATION_WARNING \
-            -I${BOOST_INC}"
+            -I${BOOST_INC} \
+            -I$TMPDIR/context/include \
+            -I$TMPDIR/coroutine/include"
 
           # Determine assembly ABI suffix for context asm files
           if [ "${{matrix.ctx_asm_arch}}" = "arm64" ]; then
