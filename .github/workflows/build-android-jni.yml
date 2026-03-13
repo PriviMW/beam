@@ -118,16 +118,14 @@ jobs:
             ${ASM_PREFIX}/ontop_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
             -o $OBJDIR/ontop.o
 
-          # Compile C++ sources
+          # Compile C++ sources (only execution_context + stack_traits needed
+          # for Boost.Coroutine; continuation/fiber are newer APIs not used)
           $CXX -c $CXX_FLAGS ${CTX_SRC}/execution_context.cpp -o $OBJDIR/execution_context.o
-          $CXX -c $CXX_FLAGS ${CTX_SRC}/continuation.cpp -o $OBJDIR/continuation.o
-          $CXX -c $CXX_FLAGS ${CTX_SRC}/fiber.cpp -o $OBJDIR/fiber.o
           $CXX -c $CXX_FLAGS ${CTX_SRC}/posix/stack_traits.cpp -o $OBJDIR/ctx_stack_traits.o
 
           $AR rcs ${BOOST_LIB}/libboost_context${SUFFIX} \
             $OBJDIR/jump.o $OBJDIR/make.o $OBJDIR/ontop.o \
-            $OBJDIR/execution_context.o $OBJDIR/continuation.o \
-            $OBJDIR/fiber.o $OBJDIR/ctx_stack_traits.o
+            $OBJDIR/execution_context.o $OBJDIR/ctx_stack_traits.o
 
           echo "Built: ${BOOST_LIB}/libboost_context${SUFFIX}"
 
