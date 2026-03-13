@@ -149,14 +149,18 @@ jobs:
           export PATH=${{env.ANDROID_NDK_HOME}}:$PATH
           make wallet-jni -j$(nproc)
 
-      - name: Save version info
+      - name: Collect artifacts
         run: |
           echo "BEAM_VERSION=$(cat beam_version.gen)" >> $GITHUB_ENV
           rm beam_version.gen
+          # Copy Go IPFS shared library next to wallet-jni for packaging
+          cp 3rdparty/asio-ipfs/ipfs_bindings/libipfs-bindings.so android/
 
       - uses: actions/upload-artifact@v4
         with:
           name: libwallet-jni-${{matrix.abi}}-${{env.BEAM_VERSION}}
-          path: android/libwallet-jni.so
+          path: |
+            android/libwallet-jni.so
+            android/libipfs-bindings.so
           if-no-files-found: error
           retention-days: 90
