@@ -13,6 +13,7 @@ on:
       - 'utility/**'
       - 'mnemonic/**'
       - 'node/**'
+      - '3rdparty/asio-ipfs/**'
 
 env:
   BUILD_TYPE: Release
@@ -50,7 +51,7 @@ jobs:
             -DCMAKE_TOOLCHAIN_FILE=${{env.ANDROID_NDK_HOME}}/build/cmake/android.toolchain.cmake \
             -DANDROID_NATIVE_API_LEVEL=${{env.ANDROID_SDK_VERSION}} \
             -DANDROID_ABI=${{matrix.abi}} \
-            -DBEAM_IPFS_SUPPORT=Off \
+            -DBEAM_IPFS_SUPPORT=On \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
             -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator" \
             .
