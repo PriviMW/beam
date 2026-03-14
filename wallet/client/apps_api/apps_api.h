@@ -190,10 +190,13 @@ namespace beam::wallet
             };
 
             // BEAM_LOG_INFO () << "AppsApi checked call for " << getAppName() << ", " << getAppId() << "): " << request;
+            bool isPID = request.find("process_invoke_data") != std::string::npos;
             makeIWTCallGuarded(
-                [this, request]() mutable -> boost::any {
+                [this, request, isPID]() mutable -> boost::any {
+                    if (isPID) BEAM_LOG_INFO() << "TIMING [process_invoke_data] reactor: parseAPIRequest START";
                     if (auto pres = _walletAPI->parseAPIRequest(request.c_str(), request.size()); pres)
                     {
+                        if (isPID) BEAM_LOG_INFO() << "TIMING [process_invoke_data] reactor: parseAPIRequest DONE, method=" << pres->acinfo.method;
                         const auto& acinfo = pres->acinfo;
                         if (acinfo.appsAllowed)
                         {
@@ -205,6 +208,7 @@ namespace beam::wallet
 
                             if (acinfo.method == "process_invoke_data")
                             {
+                                if (isPID) BEAM_LOG_INFO() << "TIMING [process_invoke_data] reactor: returning CheckInfo to callback";
                                 CheckInfo info{false, *pres};
                                 return info;
                             }
@@ -246,6 +250,7 @@ namespace beam::wallet
                         return;
                     }
 
+                    BEAM_LOG_INFO() << "TIMING [process_invoke_data] callback: dispatching consent";
                     auto cr = boost::any_cast<CheckInfo>(any);
                     if (cr.send)
                     {

@@ -59,8 +59,16 @@ void AppsApiUI::contractInfoRejected(const std::string& request)
 
 void AppsApiUI::callWalletApi(const std::string& request)
 {
+    // Timing: detect process_invoke_data and log entry timestamp
+    bool isPID = request.find("process_invoke_data") != std::string::npos;
+    if (isPID) {
+        BEAM_LOG_INFO() << "TIMING [process_invoke_data] callWalletApi ENTER";
+    }
     BEAM_LOG_INFO() << "Call Wallet Api: " << getAppName() << ", " << getAppId() << ", " << request;
     AnyThread_callWalletApiChecked(request);
+    if (isPID) {
+        BEAM_LOG_INFO() << "TIMING [process_invoke_data] callWalletApiChecked returned (async posted)";
+    }
 }
 
 void AppsApiUI::AnyThread_sendApiResponse(std::string&& result)
@@ -104,6 +112,7 @@ void AppsApiUI::ClientThread_getSendConsent(const std::string& request, const nl
 
 void AppsApiUI::ClientThread_getContractConsent(const std::string& request, const nlohmann::json& jinfo, const nlohmann::json& jamounts)
 {
+    BEAM_LOG_INFO() << "TIMING [process_invoke_data] ClientThread_getContractConsent ENTER (consent ready)";
     const auto info = prepareInfo4QT(jinfo);
     const auto amounts = prepareAmounts4QT(jamounts);
    

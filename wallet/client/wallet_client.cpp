@@ -2779,8 +2779,12 @@ namespace beam::wallet
 
     void WalletClient::makeIWTCall(std::function<boost::any()>&& function, AsyncCallback<const boost::any&>&& resultCallback)
     {
-        postFunctionToClientContext([result = function(), cb = std::move(resultCallback)]()
+        BEAM_LOG_INFO() << "TIMING makeIWTCall: executing function on reactor...";
+        auto result = function();
+        BEAM_LOG_INFO() << "TIMING makeIWTCall: function done, posting callback to client context";
+        postFunctionToClientContext([result = std::move(result), cb = std::move(resultCallback)]()
         {
+            BEAM_LOG_INFO() << "TIMING makeIWTCall: callback executing on client thread";
             cb(result);
         });
     }
