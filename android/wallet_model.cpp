@@ -186,8 +186,22 @@ namespace
                     i += 1;
                 }
                 
+                // Convert WalletStatusDTO[] array to ArrayList<WalletStatusDTO> for Kotlin interop
+                jclass arrayListClass = env->FindClass("java/util/ArrayList");
+                jmethodID arrayListInit = env->GetMethodID(arrayListClass, "<init>", "(I)V");
+                jmethodID arrayListAdd = env->GetMethodID(arrayListClass, "add", "(Ljava/lang/Object;)Z");
+                jobject assetsList = env->NewObject(arrayListClass, arrayListInit, static_cast<jint>(contractSpend.size()));
+                for (int j = 0; j < static_cast<int>(contractSpend.size()); ++j) {
+                    jobject elem = env->GetObjectArrayElement(assets, j);
+                    env->CallBooleanMethod(assetsList, arrayListAdd, elem);
+                    env->DeleteLocalRef(elem);
+                }
+                env->DeleteLocalRef(assets);
+
                 jfieldID assetFieldId = env->GetFieldID(TxDescriptionClass, "assets", "Ljava/util/ArrayList;");
-                env->SetObjectField(tx, assetFieldId, assets);
+                env->SetObjectField(tx, assetFieldId, assetsList);
+                env->DeleteLocalRef(assetsList);
+                env->DeleteLocalRef(arrayListClass);
 
                 setBooleanField(env, TxDescriptionClass, tx, "sender", mainAmount <= 0);
                 setLongField(env, TxDescriptionClass, tx, "amount", mainAmount);
