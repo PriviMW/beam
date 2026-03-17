@@ -499,7 +499,12 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             // through shared bootstrap peers, enabling mobile-to-mobile NAT traversal
             ipfsCfg.relay_hop = true;
             ipfsCfg.auto_relay = true;
-            ipfsCfg.routing_type = "dht";
+            // Use dhtserver mode — same as desktop wallet.
+            // dht mode auto-switches to dhtclient behind NAT, which stops providing content.
+            // dhtserver always provides content to DHT regardless of NAT status.
+            ipfsCfg.routing_type = "dhtserver";
+            // Apply server profile like desktop — enables full DHT participation
+            ipfsCfg.default_profile = "server";
 
             // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
             // Falls back to hardcoded IPs if DNS fails.
@@ -597,7 +602,12 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             // through shared bootstrap peers, enabling mobile-to-mobile NAT traversal
             ipfsCfg.relay_hop = true;
             ipfsCfg.auto_relay = true;
-            ipfsCfg.routing_type = "dht";
+            // Use dhtserver mode — same as desktop wallet.
+            // dht mode auto-switches to dhtclient behind NAT, which stops providing content.
+            // dhtserver always provides content to DHT regardless of NAT status.
+            ipfsCfg.routing_type = "dhtserver";
+            // Apply server profile like desktop — enables full DHT participation
+            ipfsCfg.default_profile = "server";
 
             // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
             // Falls back to hardcoded IPs if DNS fails.
