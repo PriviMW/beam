@@ -495,6 +495,11 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             ipfsCfg.low_water = 60;
             ipfsCfg.high_water = 100;
             ipfsCfg.grace_period = 30;
+            // Enable relay hop — allows mobile nodes to relay for each other
+            // through shared bootstrap peers, enabling mobile-to-mobile NAT traversal
+            ipfsCfg.relay_hop = true;
+            ipfsCfg.auto_relay = true;
+            ipfsCfg.routing_type = "dht";
 
             // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
             // Falls back to hardcoded IPs if DNS fails.
@@ -502,7 +507,7 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
 
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting with resolved bootstrap peers...";
+            BEAM_LOG_INFO() << "IPFS node starting with relay_hop + resolved bootstrap peers...";
         }
         #endif
 
@@ -588,6 +593,11 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             ipfsCfg.low_water = 60;
             ipfsCfg.high_water = 100;
             ipfsCfg.grace_period = 30;
+            // Enable relay hop — allows mobile nodes to relay for each other
+            // through shared bootstrap peers, enabling mobile-to-mobile NAT traversal
+            ipfsCfg.relay_hop = true;
+            ipfsCfg.auto_relay = true;
+            ipfsCfg.routing_type = "dht";
 
             // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
             // Falls back to hardcoded IPs if DNS fails.
@@ -595,7 +605,7 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
 
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting with resolved bootstrap peers...";
+            BEAM_LOG_INFO() << "IPFS node starting with relay_hop + resolved bootstrap peers...";
         }
         #endif
 
