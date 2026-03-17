@@ -435,9 +435,15 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             ipfsCfg.low_water = 60;
             ipfsCfg.high_water = 100;
             ipfsCfg.grace_period = 30;
+            // Beam mainnet IPFS peers with IP addresses (Go DNS fails on Android)
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+            ipfsCfg.peering = ipfsCfg.bootstrap;
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting...";
+            BEAM_LOG_INFO() << "IPFS node starting with " << 4 << " IP-based bootstrap peers";
         }
         #endif
 
@@ -523,9 +529,15 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             ipfsCfg.low_water = 60;
             ipfsCfg.high_water = 100;
             ipfsCfg.grace_period = 30;
+            // Beam mainnet IPFS peers with IP addresses (Go DNS fails on Android)
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.33/tcp/38041/p2p/12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.35/tcp/38041/p2p/12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.34/tcp/38041/p2p/12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt");
+            ipfsCfg.bootstrap.emplace_back("/ip4/188.245.67.32/tcp/38041/p2p/12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ");
+            ipfsCfg.peering = ipfsCfg.bootstrap;
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting...";
+            BEAM_LOG_INFO() << "IPFS node starting with " << 4 << " IP-based bootstrap peers";
         }
         #endif
 
