@@ -492,9 +492,9 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             asio_ipfs::config ipfsCfg(asio_ipfs::config::Mode::Desktop);
             ipfsCfg.repo_root = appData + "/ipfs-repo";
             ipfsCfg.storage_max = "1GB";
-            ipfsCfg.low_water = 20;
-            ipfsCfg.high_water = 40;
-            ipfsCfg.grace_period = 20;
+            ipfsCfg.low_water = 60;
+            ipfsCfg.high_water = 100;
+            ipfsCfg.grace_period = 30;
 
             // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
             // Falls back to hardcoded IPs if DNS fails.
@@ -585,9 +585,9 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             asio_ipfs::config ipfsCfg(asio_ipfs::config::Mode::Desktop);
             ipfsCfg.repo_root = appData + "/ipfs-repo";
             ipfsCfg.storage_max = "1GB";
-            ipfsCfg.low_water = 20;
-            ipfsCfg.high_water = 40;
-            ipfsCfg.grace_period = 20;
+            ipfsCfg.low_water = 60;
+            ipfsCfg.high_water = 100;
+            ipfsCfg.grace_period = 30;
 
             // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
             // Falls back to hardcoded IPs if DNS fails.
