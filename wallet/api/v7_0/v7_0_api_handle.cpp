@@ -85,8 +85,9 @@ namespace beam::wallet
     {
         #ifdef BEAM_IPFS_SUPPORT
         auto ipfs = getIPFS();
+        auto wantBase64 = req.base64;
         ipfs->AnyThread_get(req.hash, req.timeout,
-        [this, id, hash = req.hash, wguard = _weakSelf](std::vector<uint8_t>&& data) {
+        [this, id, hash = req.hash, wantBase64, wguard = _weakSelf](std::vector<uint8_t>&& data) {
                 auto guard = wguard.lock();
                 if (!guard)
                 {
@@ -94,7 +95,7 @@ namespace beam::wallet
                     return;
                 }
 
-                IPFSGet::Response response = {hash, std::move(data)};
+                IPFSGet::Response response = {hash, std::move(data), wantBase64};
                 doResponse(id, response);
             },
             [this, id, wguard = _weakSelf] (std::string&& err) {

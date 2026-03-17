@@ -58,11 +58,13 @@ namespace beam::wallet
     {
         std::string hash;
         uint32_t timeout = 0;
+        bool base64 = false;  // If true, return data as base64 string instead of array
 
         struct Response
         {
             std::string hash;
             std::vector<uint8_t> data;
+            bool base64 = false;
         };
     };
 
