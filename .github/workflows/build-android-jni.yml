@@ -39,6 +39,12 @@ jobs:
       - name: Submodule update
         run: git submodule update --init --recursive --jobs 4
 
+      - name: Update Go module checksums
+        run: |
+          cd 3rdparty/asio-ipfs
+          go mod tidy
+          echo "go.sum updated with $(wc -l < go.sum) entries"
+
       - name: Create Build Environment
         run: |
           # Unset credential helper to avoid 403 on public repo clones
