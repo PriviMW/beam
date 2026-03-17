@@ -1117,6 +1117,25 @@ void WalletModel::onAssetInfo(Asset::ID assetId, const WalletAsset& asset)
 }
 
 #ifdef BEAM_IPFS_SUPPORT
+void WalletModel::onInstantMessage(Timestamp time, const WalletID& counterpart, const std::string& message, bool isIncome)
+{
+    BEAM_LOG_DEBUG() << "onInstantMessage() income=" << isIncome << " time=" << time;
+
+    JNIEnv* env = Android_JNI_getEnv();
+
+    jmethodID callback = env->GetStaticMethodID(WalletListenerClass, "onInstantMessage", "(JLjava/lang/String;Ljava/lang/String;Z)V");
+
+    jlong jtime = static_cast<jlong>(time);
+    jstring jsender = env->NewStringUTF(to_string(counterpart).c_str());
+    jstring jmessage = env->NewStringUTF(message.c_str());
+    jboolean jincome = static_cast<jboolean>(isIncome);
+
+    env->CallStaticVoidMethod(WalletListenerClass, callback, jtime, jsender, jmessage, jincome);
+
+    env->DeleteLocalRef(jsender);
+    env->DeleteLocalRef(jmessage);
+}
+
 void WalletModel::onIPFSStatus(bool running, const std::string& error, unsigned int peercnt)
 {
     ipfsPeerCount.store(static_cast<int>(peercnt));

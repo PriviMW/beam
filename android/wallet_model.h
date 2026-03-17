@@ -82,6 +82,7 @@ private:
     void onExchangeRates(const std::vector<beam::wallet::ExchangeRate>&) override;
     void onPublicAddress(const std::string& publicAddr) override;
     void onAssetInfo(beam::Asset::ID assetId, const beam::wallet::WalletAsset&) override;
+    void onInstantMessage(beam::Timestamp time, const beam::wallet::WalletID& counterpart, const std::string& message, bool isIncome) override;
 #ifdef BEAM_IPFS_SUPPORT
     void onIPFSStatus(bool running, const std::string& error, unsigned int peercnt) override;
 #endif
