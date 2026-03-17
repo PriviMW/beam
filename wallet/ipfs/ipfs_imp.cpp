@@ -345,7 +345,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected get call. IPFS is not started");
                 return;
             }
-            _ios.post([this, hash, timeout, res = std::move(res), err = std::move(err)]() mutable {
+            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
                 BEAM_LOG_INFO() << "IPFS cat: posted to ASIO thread, calling _node->cat(" << hash << ")";
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->cat(hash, *cancel,
