@@ -279,21 +279,6 @@ namespace beam::wallet::imp
                                 AnyThreaad_retErr(std::move(err), ec.message());
                             } else {
                                 BEAM_LOG_INFO() << "IPFS add SUCCESS: CID=" << cid;
-                                // Trigger DHT provide via Go directly (bypass coroutine)
-                                BEAM_LOG_INFO() << "IPFS DHT provide starting for " << cid;
-                                {
-                                    auto provideCid = cid;
-                                    auto provCancel = std::make_shared<std::function<void()>>();
-                                    _node->provide_(provideCid, provCancel.get(),
-                                        std::function<void(boost::system::error_code)>(
-                                            [provideCid, provCancel](boost::system::error_code pec) {
-                                                if (pec) {
-                                                    BEAM_LOG_ERROR() << "IPFS DHT provide FAILED: " << provideCid << " err=" << pec.message();
-                                                } else {
-                                                    BEAM_LOG_INFO() << "IPFS DHT provide SUCCESS: " << provideCid;
-                                                }
-                                            }));
-                                }
                                 AnyThreaad_retVal(std::move(res), std::move(cid));
                             }
                         }));

@@ -29,8 +29,6 @@
 
 #ifdef BEAM_IPFS_SUPPORT
 #include "3rdparty/asio-ipfs/include/ipfs_config.h"
-#include <netdb.h>
-#include <arpa/inet.h>
 #endif
 
 #include <boost/filesystem.hpp>
@@ -87,81 +85,6 @@ namespace
     static std::string lastWalledId("");
 
     static unique_ptr<WebAPICreator> webAPICreator;
-
-#ifdef BEAM_IPFS_SUPPORT
-    // Beam mainnet IPFS bootstrap peers — hostname, fallback IP, port, libp2p peer ID
-    struct IpfsPeer {
-        const char* hostname;
-        const char* fallbackIp;
-        int port;
-        const char* peerId;
-    };
-
-    static const IpfsPeer g_BeamIpfsPeers[] = {
-        {"eu-node01.mainnet.beam.mw", "188.245.67.33", 38041, "12D3KooWJFduasQPYWhw4SsoFPmnJ1PXfmHYaA9qYKvn4JKM2hND"},
-        {"eu-node02.mainnet.beam.mw", "188.245.67.35", 38041, "12D3KooWCjmtegxdSkkfutWqty39dwhEhYDWCDj6KCizDtft3sqc"},
-        {"eu-node03.mainnet.beam.mw", "188.245.67.34", 38041, "12D3KooWL5c6JHHkfYLzBjcuot27eyKVhhczvvY617v1cy7QVUHt"},
-        {"eu-node04.mainnet.beam.mw", "188.245.67.32", 38041, "12D3KooWHpgKQYXJMKXQZuwbuRoFK28cQLiVjCVFxhSpFX9XHNWZ"},
-    };
-
-    // Resolve hostname via bionic getaddrinfo (works on Android, unlike Go's resolver).
-    // Returns resolved IP string, or fallbackIp if DNS fails.
-    std::string resolveHostname(const char* hostname, const char* fallbackIp)
-    {
-        struct addrinfo hints = {};
-        hints.ai_family = AF_INET;  // IPv4
-        hints.ai_socktype = SOCK_STREAM;
-
-        struct addrinfo* result = nullptr;
-        int err = getaddrinfo(hostname, nullptr, &hints, &result);
-        if (err == 0 && result) {
-            char ipStr[INET_ADDRSTRLEN];
-            auto* addr = reinterpret_cast<struct sockaddr_in*>(result->ai_addr);
-            inet_ntop(AF_INET, &addr->sin_addr, ipStr, sizeof(ipStr));
-            freeaddrinfo(result);
-            BEAM_LOG_INFO() << "IPFS DNS: " << hostname << " -> " << ipStr;
-            return std::string(ipStr);
-        }
-        if (result) freeaddrinfo(result);
-        BEAM_LOG_WARNING() << "IPFS DNS failed for " << hostname << " (err=" << err
-                           << "), using fallback " << fallbackIp;
-        return std::string(fallbackIp);
-    }
-
-    // Build multiaddr string: /ip4/<ip>/tcp/<port>/p2p/<peerId>
-    std::string buildMultiaddr(const std::string& ip, int port, const char* peerId)
-    {
-        return "/ip4/" + ip + "/tcp/" + std::to_string(port) + "/p2p/" + peerId;
-    }
-
-    // Populate IPFS config with resolved bootstrap + peering peers
-    // Official IPFS public bootstrap peers — these run relay v2 and support DCUtR hole punching
-    static const char* g_IpfsPublicBootstrap[] = {
-        "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
-        "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
-        "/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
-        "/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt",
-        "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
-    };
-
-    void populateIpfsPeers(asio_ipfs::config& cfg)
-    {
-        // Add Beam-specific bootstrap peers
-        for (const auto& peer : g_BeamIpfsPeers) {
-            std::string ip = resolveHostname(peer.hostname, peer.fallbackIp);
-            std::string addr = buildMultiaddr(ip, peer.port, peer.peerId);
-            cfg.bootstrap.emplace_back(addr);
-            cfg.peering.emplace_back(addr);
-        }
-        // Add public IPFS bootstrap peers — these support relay v2 + DCUtR hole punching
-        for (const auto& addr : g_IpfsPublicBootstrap) {
-            cfg.bootstrap.emplace_back(addr);
-        }
-        BEAM_LOG_INFO() << "IPFS bootstrap: " << cfg.bootstrap.size() << " peers ("
-                        << (sizeof(g_BeamIpfsPeers)/sizeof(g_BeamIpfsPeers[0])) << " Beam + "
-                        << (sizeof(g_IpfsPublicBootstrap)/sizeof(g_IpfsPublicBootstrap[0])) << " public)";
-    }
-#endif
 
     void initLogger(const string& appData, const string& appVersion)
     {
@@ -512,24 +435,9 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
             ipfsCfg.low_water = 60;
             ipfsCfg.high_water = 100;
             ipfsCfg.grace_period = 30;
-            // Enable relay hop — allows mobile nodes to relay for each other
-            // through shared bootstrap peers, enabling mobile-to-mobile NAT traversal
-            ipfsCfg.relay_hop = true;
-            ipfsCfg.auto_relay = true;
-            // Use dhtserver mode — same as desktop wallet.
-            // dht mode auto-switches to dhtclient behind NAT, which stops providing content.
-            // dhtserver always provides content to DHT regardless of NAT status.
-            ipfsCfg.routing_type = "dhtserver";
-            // Apply server profile like desktop — enables full DHT participation
-            ipfsCfg.default_profile = "server";
-
-            // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
-            // Falls back to hardcoded IPs if DNS fails.
-            populateIpfsPeers(ipfsCfg);
-
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting with relay_hop + resolved bootstrap peers...";
+            BEAM_LOG_INFO() << "IPFS node starting...";
         }
         #endif
 
@@ -615,24 +523,9 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
             ipfsCfg.low_water = 60;
             ipfsCfg.high_water = 100;
             ipfsCfg.grace_period = 30;
-            // Enable relay hop — allows mobile nodes to relay for each other
-            // through shared bootstrap peers, enabling mobile-to-mobile NAT traversal
-            ipfsCfg.relay_hop = true;
-            ipfsCfg.auto_relay = true;
-            // Use dhtserver mode — same as desktop wallet.
-            // dht mode auto-switches to dhtclient behind NAT, which stops providing content.
-            // dhtserver always provides content to DHT regardless of NAT status.
-            ipfsCfg.routing_type = "dhtserver";
-            // Apply server profile like desktop — enables full DHT participation
-            ipfsCfg.default_profile = "server";
-
-            // Resolve bootstrap peer hostnames via bionic DNS (works on Android).
-            // Falls back to hardcoded IPs if DNS fails.
-            populateIpfsPeers(ipfsCfg);
-
             walletModel->getAsync()->setIPFSConfig(std::move(ipfsCfg));
             walletModel->getAsync()->startIPFSNode();
-            BEAM_LOG_INFO() << "IPFS node starting with relay_hop + resolved bootstrap peers...";
+            BEAM_LOG_INFO() << "IPFS node starting...";
         }
         #endif
 
