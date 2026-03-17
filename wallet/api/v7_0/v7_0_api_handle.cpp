@@ -20,6 +20,7 @@ namespace beam::wallet
     void V70Api::onHandleIPFSAdd(const JsonRpcId &id, IPFSAdd&& req)
     {
         #ifdef BEAM_IPFS_SUPPORT
+        BEAM_LOG_INFO() << "IPFS ADD: starting, size=" << req.data.size() << " pin=" << req.pin;
         auto ipfs = getIPFS();
         ipfs->AnyThread_add(std::move(req.data), req.pin, req.timeout,
             [this, id, pin = req.pin, wguard = _weakSelf](std::string&& hash) {
@@ -30,6 +31,7 @@ namespace beam::wallet
                     return;
                 }
 
+                BEAM_LOG_INFO() << "IPFS ADD: success, hash=" << hash;
                 IPFSAdd::Response response = {hash, pin};
                 doResponse(id, response);
             },
@@ -84,6 +86,7 @@ namespace beam::wallet
     void V70Api::onHandleIPFSGet(const JsonRpcId &id, IPFSGet&& req)
     {
         #ifdef BEAM_IPFS_SUPPORT
+        BEAM_LOG_INFO() << "IPFS GET: starting, hash=" << req.hash << " timeout=" << req.timeout << " base64=" << req.base64;
         auto ipfs = getIPFS();
         auto wantBase64 = req.base64;
         ipfs->AnyThread_get(req.hash, req.timeout,
@@ -95,6 +98,7 @@ namespace beam::wallet
                     return;
                 }
 
+                BEAM_LOG_INFO() << "IPFS GET: success, hash=" << hash << " size=" << data.size() << " base64=" << wantBase64;
                 IPFSGet::Response response = {hash, std::move(data), wantBase64};
                 doResponse(id, response);
             },
@@ -106,6 +110,7 @@ namespace beam::wallet
                     return;
                 }
 
+                BEAM_LOG_ERROR() << "IPFS GET: FAILED, error=" << err;
                 sendError(id, ApiError::IPFSError, err);
             }
         );

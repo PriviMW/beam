@@ -268,13 +268,19 @@ namespace beam::wallet::imp
                 return;
             }
             _ios.post([this, data = std::move(data), pin, res = std::move(res), err = std::move(err)]() mutable {
+                BEAM_LOG_INFO() << "IPFS add (Android): posted to ASIO thread, size=" << data.size() << " pin=" << pin;
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->add(&data[0], data.size(), pin, *cancel,
                     std::function<void(boost::system::error_code, std::string)>(
                         [this, res = std::move(res), err = std::move(err), cancel](
                             boost::system::error_code ec, std::string cid) mutable {
-                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
-                            else    { AnyThreaad_retVal(std::move(res), std::move(cid)); }
+                            if (ec) {
+                                BEAM_LOG_ERROR() << "IPFS add FAILED: " << ec.message();
+                                AnyThreaad_retErr(std::move(err), ec.message());
+                            } else {
+                                BEAM_LOG_INFO() << "IPFS add SUCCESS: CID=" << cid;
+                                AnyThreaad_retVal(std::move(res), std::move(cid));
+                            }
                         }));
             });
         }
@@ -332,19 +338,27 @@ namespace beam::wallet::imp
 
 #ifdef __ANDROID__
         {
+            BEAM_LOG_INFO() << "IPFS cat (Android): hash=" << hash << " timeout=" << timeout;
             std::scoped_lock lock(_mutex);
             if (!_thread.joinable()) {
+                BEAM_LOG_ERROR() << "IPFS cat: node not started!";
                 AnyThreaad_retErr(std::move(err), "Unexpected get call. IPFS is not started");
                 return;
             }
-            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+            _ios.post([this, hash, timeout, res = std::move(res), err = std::move(err)]() mutable {
+                BEAM_LOG_INFO() << "IPFS cat: posted to ASIO thread, calling _node->cat(" << hash << ")";
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->cat(hash, *cancel,
                     std::function<void(boost::system::error_code, std::vector<uint8_t>)>(
-                        [this, res = std::move(res), err = std::move(err), cancel](
+                        [this, hash, res = std::move(res), err = std::move(err), cancel](
                             boost::system::error_code ec, std::vector<uint8_t> data) mutable {
-                            if (ec) { AnyThreaad_retErr(std::move(err), ec.message()); }
-                            else    { AnyThreaad_retVal(std::move(res), std::move(data)); }
+                            if (ec) {
+                                BEAM_LOG_ERROR() << "IPFS cat FAILED: hash=" << hash << " error=" << ec.message();
+                                AnyThreaad_retErr(std::move(err), ec.message());
+                            } else {
+                                BEAM_LOG_INFO() << "IPFS cat SUCCESS: hash=" << hash << " size=" << data.size();
+                                AnyThreaad_retVal(std::move(res), std::move(data));
+                            }
                         }));
             });
         }
