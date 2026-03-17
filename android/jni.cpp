@@ -135,14 +135,31 @@ namespace
     }
 
     // Populate IPFS config with resolved bootstrap + peering peers
+    // Official IPFS public bootstrap peers — these run relay v2 and support DCUtR hole punching
+    static const char* g_IpfsPublicBootstrap[] = {
+        "/dnsaddr/bootstrap.libp2p.io/p2p/QmNnooDu7bfjPFoTZYxMNLWUQJyrVwtbZg5gBMjTezGAJN",
+        "/dnsaddr/bootstrap.libp2p.io/p2p/QmQCU2EcMqAqQPR2i9bChDtGNJchTbq5TbXJJ16u19uLTa",
+        "/dnsaddr/bootstrap.libp2p.io/p2p/QmbLHAnMoJPWSCR5Zhtx6BHJX9KiKNN6tpvbUcqanj75Nb",
+        "/dnsaddr/bootstrap.libp2p.io/p2p/QmcZf59bWwK5XFi76CZX8cbJ4BhTzzA3gU1ZjYZcYW3dwt",
+        "/ip4/104.131.131.82/tcp/4001/p2p/QmaCpDMGvV2BGHeYERUEnRQAwe3N8SzbUtfsmvsqQLuvuJ",
+    };
+
     void populateIpfsPeers(asio_ipfs::config& cfg)
     {
+        // Add Beam-specific bootstrap peers
         for (const auto& peer : g_BeamIpfsPeers) {
             std::string ip = resolveHostname(peer.hostname, peer.fallbackIp);
             std::string addr = buildMultiaddr(ip, peer.port, peer.peerId);
             cfg.bootstrap.emplace_back(addr);
             cfg.peering.emplace_back(addr);
         }
+        // Add public IPFS bootstrap peers — these support relay v2 + DCUtR hole punching
+        for (const auto& addr : g_IpfsPublicBootstrap) {
+            cfg.bootstrap.emplace_back(addr);
+        }
+        BEAM_LOG_INFO() << "IPFS bootstrap: " << cfg.bootstrap.size() << " peers ("
+                        << (sizeof(g_BeamIpfsPeers)/sizeof(g_BeamIpfsPeers[0])) << " Beam + "
+                        << (sizeof(g_IpfsPublicBootstrap)/sizeof(g_IpfsPublicBootstrap[0])) << " public)";
     }
 #endif
 
