@@ -117,6 +117,56 @@ namespace
             setBooleanField(env, TxDescriptionClass, tx, "isDapps", true);
         }
 
+#ifdef BEAM_ASSET_SWAP_SUPPORT
+        if (txDescription.m_txType == wallet::TxType::DexSimpleSwap)
+        {
+            setBooleanField(env, TxDescriptionClass, tx, "isDapps", true);
+
+            // Extract swap receive asset/amount from TX parameters (same as beam-ui)
+            auto rasset = txDescription.GetParameter<Asset::ID>(TxParameterID::DexReceiveAsset);
+            auto ramount = txDescription.GetParameter<Amount>(TxParameterID::DexReceiveAmount);
+            if (rasset && ramount)
+            {
+                // Build contractAssets with both sides of the swap
+                jclass arrayListClass = env->FindClass("java/util/ArrayList");
+                jmethodID arrayListInit = env->GetMethodID(arrayListClass, "<init>", "(I)V");
+                jmethodID arrayListAdd = env->GetMethodID(arrayListClass, "add", "(Ljava/lang/Object;)Z");
+                jobject assetsList = env->NewObject(arrayListClass, arrayListInit, 2);
+
+                // Sent asset (what taker sends)
+                jobject sentAsset = env->AllocObject(WalletStatusClass);
+                setIntField(env, WalletStatusClass, sentAsset, "assetId", static_cast<jint>(txDescription.m_assetId));
+                setLongField(env, WalletStatusClass, sentAsset, "sending", static_cast<jlong>(txDescription.m_amount));
+                setLongField(env, WalletStatusClass, sentAsset, "receiving", 0);
+                setLongField(env, WalletStatusClass, sentAsset, "available", 0);
+                setLongField(env, WalletStatusClass, sentAsset, "maturing", 0);
+                setLongField(env, WalletStatusClass, sentAsset, "shielded", 0);
+                setLongField(env, WalletStatusClass, sentAsset, "maxPrivacy", 0);
+                env->CallBooleanMethod(assetsList, arrayListAdd, sentAsset);
+                env->DeleteLocalRef(sentAsset);
+
+                // Received asset (what taker receives)
+                jobject recvAsset = env->AllocObject(WalletStatusClass);
+                setIntField(env, WalletStatusClass, recvAsset, "assetId", static_cast<jint>(*rasset));
+                setLongField(env, WalletStatusClass, recvAsset, "sending", 0);
+                setLongField(env, WalletStatusClass, recvAsset, "receiving", static_cast<jlong>(*ramount));
+                setLongField(env, WalletStatusClass, recvAsset, "available", 0);
+                setLongField(env, WalletStatusClass, recvAsset, "maturing", 0);
+                setLongField(env, WalletStatusClass, recvAsset, "shielded", 0);
+                setLongField(env, WalletStatusClass, recvAsset, "maxPrivacy", 0);
+                env->CallBooleanMethod(assetsList, arrayListAdd, recvAsset);
+                env->DeleteLocalRef(recvAsset);
+
+                jfieldID assetFieldId = env->GetFieldID(TxDescriptionClass, "assets", "Ljava/util/ArrayList;");
+                env->SetObjectField(tx, assetFieldId, assetsList);
+                env->DeleteLocalRef(assetsList);
+                env->DeleteLocalRef(arrayListClass);
+            }
+
+            setStringField(env, TxDescriptionClass, tx, "appName", "Assets Swap");
+        }
+#endif  // BEAM_ASSET_SWAP_SUPPORT
+
         if (txDescription.m_txType == wallet::TxType::Contract)
         {
             setBooleanField(env, TxDescriptionClass, tx, "isDapps", true);
