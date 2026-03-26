@@ -57,8 +57,9 @@ if (NOT ANDROID AND NOT IOS)
     if(BEAM_LASER_SUPPORT)
         target_compile_definitions(wallet_core PUBLIC BEAM_LASER_SUPPORT)
     endif()
+endif()
 
-    if(BEAM_ASSET_SWAP_SUPPORT)
-        target_compile_definitions(wallet_core PUBLIC BEAM_ASSET_SWAP_SUPPORT)
-    endif()
+# Asset swap support — enabled for all platforms including Android
+if(BEAM_ASSET_SWAP_SUPPORT)
+    target_compile_definitions(wallet_core PUBLIC BEAM_ASSET_SWAP_SUPPORT)
 endif()
