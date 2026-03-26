@@ -423,9 +423,9 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(createWallet)(JNIEnv *env, job
         
         auto additionalTxCreators = std::make_shared<std::unordered_map<TxType, BaseTransaction::Creator::Ptr>>();
         additionalTxCreators->emplace(TxType::PushTransaction, pushTxCreator);
-        //additionalTxCreators->emplace(TxType::DexSimpleSwap, std::make_shared<DexTransaction::Creator>(walletDB));
-
-
+#ifdef BEAM_ASSET_SWAP_SUPPORT
+        additionalTxCreators->emplace(TxType::DexSimpleSwap, std::make_shared<beam::wallet::DexTransaction::Creator>(walletDB));
+#endif
         walletModel->start(initNotifications(true), true, additionalTxCreators);
 
         #ifdef BEAM_IPFS_SUPPORT
@@ -516,8 +516,9 @@ JNIEXPORT jobject JNICALL BEAM_JAVA_API_INTERFACE(openWallet)(JNIEnv *env, jobje
         
         auto additionalTxCreators = std::make_shared<std::unordered_map<TxType, BaseTransaction::Creator::Ptr>>();
         additionalTxCreators->emplace(TxType::PushTransaction, pushTxCreator);
-        //additionalTxCreators->emplace(TxType::DexSimpleSwap, std::make_shared<DexTransaction::Creator>(walletDB));
-
+#ifdef BEAM_ASSET_SWAP_SUPPORT
+        additionalTxCreators->emplace(TxType::DexSimpleSwap, std::make_shared<beam::wallet::DexTransaction::Creator>(walletDB));
+#endif
         walletModel->getAsync()->enableBodyRequests(enableBodyRequests);
 
         walletModel->start(initNotifications(true), true, additionalTxCreators);
