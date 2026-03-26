@@ -1328,9 +1328,23 @@ JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(acceptDexOrder)(JNIEnv *env, j
         return;
     }
 
-    __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: IDs parsed OK, creating DexTransactionParams...");
+    __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: IDs parsed OK, saving address + creating TX...");
 
     try {
+        // Step 1: Save a default address for the swap (same as beam-ui desktop)
+        // The wallet needs a return address for the swap negotiation
+        auto walletDB = walletModel->getWalletDB();
+        if (walletDB) {
+            auto addresses = walletDB->getAddresses(true);
+            if (!addresses.empty()) {
+                auto& addr = addresses[0];
+                addr.m_duration = beam::wallet::WalletAddress::AddressExpirationAuto;
+                walletModel->getAsync()->saveAddress(addr);
+                __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: saved address for swap negotiation");
+            }
+        }
+
+        // Step 2: Create DexTransactionParams and start TX
         auto params = beam::wallet::CreateDexTransactionParams(
             orderId,
             sbbsId,
