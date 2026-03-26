@@ -76,6 +76,7 @@ private:
 #endif // BEAM_ATOMIC_SWAP_SUPPORT
 #ifdef BEAM_ASSET_SWAP_SUPPORT
     void onExportAssetsSwapTxHistoryToCsv(const std::string& data) override;
+    void onDexOrdersChanged(beam::wallet::ChangeAction action, const std::vector<beam::wallet::DexOrder>& orders) override;
 #endif  // BEAM_ASSET_SWAP_SUPPORT
     void onExportContractTxHistoryToCsv(const std::string& data) override;
     void onNotificationsChanged(beam::wallet::ChangeAction action, const std::vector<beam::wallet::Notification>&) override;

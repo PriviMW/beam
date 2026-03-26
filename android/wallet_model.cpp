@@ -1049,7 +1049,7 @@ void WalletModel::onExportAtomicSwapTxHistoryToCsv(const std::string& data)
 #endif // BEAM_ATOMIC_SWAP_SUPPORT
 
 #ifdef BEAM_ASSET_SWAP_SUPPORT
-void WalletModel::onExportAssetsSwapTxHistoryToCsv(const std::string& data) 
+void WalletModel::onExportAssetsSwapTxHistoryToCsv(const std::string& data)
 {
     BEAM_LOG_DEBUG() << "onExportAssetsSwapTxHistoryToCsv()";
 
@@ -1061,6 +1061,51 @@ void WalletModel::onExportAssetsSwapTxHistoryToCsv(const std::string& data)
 
     env->CallStaticVoidMethod(WalletListenerClass, callback, jdata);
     env->DeleteLocalRef(jdata);
+}
+
+void WalletModel::onDexOrdersChanged(ChangeAction action, const std::vector<DexOrder>& orders)
+{
+    BEAM_LOG_DEBUG() << "onDexOrdersChanged() action=" << static_cast<int>(action) << " count=" << orders.size();
+
+    JNIEnv* env = Android_JNI_getEnv();
+
+    // Serialize orders to JSON array string for Kotlin parsing
+    std::string json = "[";
+    for (size_t i = 0; i < orders.size(); ++i)
+    {
+        const auto& o = orders[i];
+        if (i > 0) json += ",";
+        json += "{";
+        json += "\"orderID\":\"" + to_hex(o.getID().m_pData, o.getID().nBytes) + "\",";
+        json += "\"sbbsID\":\"" + to_string(o.getSBBSID()) + "\",";
+        json += "\"assetIdFirst\":" + std::to_string(o.getFirstAssetId()) + ",";
+        json += "\"assetIdSecond\":" + std::to_string(o.getSecondAssetId()) + ",";
+        json += "\"amountFirst\":" + std::to_string(o.getFirstAmount()) + ",";
+        json += "\"amountSecond\":" + std::to_string(o.getSecondAmount()) + ",";
+        json += "\"snameFirst\":\"" + o.getFirstAssetSname() + "\",";
+        json += "\"snameSecond\":\"" + o.getSecondAssetSname() + "\",";
+        json += "\"createTime\":" + std::to_string(o.getCreation()) + ",";
+        json += "\"expireTime\":" + std::to_string(o.getExpiration()) + ",";
+        json += "\"isMine\":" + std::string(o.isMine() ? "true" : "false") + ",";
+        json += "\"isAccepted\":" + std::string(o.isAccepted() ? "true" : "false") + ",";
+        json += "\"isCanceled\":" + std::string(o.isCanceled() ? "true" : "false") + ",";
+        json += "\"isExpired\":" + std::string(o.isExpired() ? "true" : "false");
+        json += "}";
+    }
+    json += "]";
+
+    jmethodID callback = env->GetStaticMethodID(WalletListenerClass, "onDexOrdersChanged", "(ILjava/lang/String;)V");
+    if (callback == nullptr)
+    {
+        BEAM_LOG_WARNING() << "onDexOrdersChanged: callback not found in WalletListener";
+        return;
+    }
+
+    jint jaction = static_cast<jint>(action);
+    jstring jorders = env->NewStringUTF(json.c_str());
+
+    env->CallStaticVoidMethod(WalletListenerClass, callback, jaction, jorders);
+    env->DeleteLocalRef(jorders);
 }
 #endif  // BEAM_ASSET_SWAP_SUPPORT
 
