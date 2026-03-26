@@ -22,6 +22,7 @@
 #include "wallet/core/simple_transaction.h"
 #include "wallet/core/common_utils.h"
 #include "wallet/transactions/dex/dex_tx.h"
+#include <android/log.h>
 
 #include "utility/bridge.h"
 #include "utility/string_helpers.h"
@@ -1306,36 +1307,46 @@ JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(cancelDexOrder)(JNIEnv *env, j
 JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(acceptDexOrder)(JNIEnv *env, jobject thiz,
     jstring jorderId, jstring jsbbsId, jint sendAssetId, jlong sendAmount, jint receiveAssetId, jlong receiveAmount, jlong fee)
 {
-    BEAM_LOG_DEBUG() << "acceptDexOrder()";
     auto orderIdHex = JString(env, jorderId).value();
     auto sbbsIdStr = JString(env, jsbbsId).value();
+
+    __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: orderId=%s sbbsId=%s(%zu chars) coinMy=%d amtMy=%lld coinPeer=%d amtPeer=%lld fee=%lld",
+        orderIdHex.c_str(), sbbsIdStr.c_str(), sbbsIdStr.size(), sendAssetId, (long long)sendAmount, receiveAssetId, (long long)receiveAmount, (long long)fee);
 
     beam::wallet::DexOrderID orderId;
     beam::wallet::WalletID sbbsId;
 
     if (!orderId.FromHex(orderIdHex))
     {
-        BEAM_LOG_WARNING() << "acceptDexOrder: invalid order ID";
+        __android_log_print(ANDROID_LOG_ERROR, "DEX_JNI", "acceptDexOrder: FAILED — invalid order ID: %s", orderIdHex.c_str());
         return;
     }
 
     if (!sbbsId.FromHex(sbbsIdStr))
     {
-        BEAM_LOG_WARNING() << "acceptDexOrder: invalid SBBS ID";
+        __android_log_print(ANDROID_LOG_ERROR, "DEX_JNI", "acceptDexOrder: FAILED — invalid SBBS ID: %s (%zu chars)", sbbsIdStr.c_str(), sbbsIdStr.size());
         return;
     }
 
-    auto params = beam::wallet::CreateDexTransactionParams(
-        orderId,
-        sbbsId,
-        static_cast<beam::Asset::ID>(sendAssetId),
-        static_cast<beam::Amount>(sendAmount),
-        static_cast<beam::Asset::ID>(receiveAssetId),
-        static_cast<beam::Amount>(receiveAmount),
-        static_cast<beam::Amount>(fee)
-    );
+    __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: IDs parsed OK, creating DexTransactionParams...");
 
-    walletModel->getAsync()->startTransaction(std::move(params));
+    try {
+        auto params = beam::wallet::CreateDexTransactionParams(
+            orderId,
+            sbbsId,
+            static_cast<beam::Asset::ID>(sendAssetId),
+            static_cast<beam::Amount>(sendAmount),
+            static_cast<beam::Asset::ID>(receiveAssetId),
+            static_cast<beam::Amount>(receiveAmount),
+            static_cast<beam::Amount>(fee)
+        );
+
+        __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: calling startTransaction...");
+        walletModel->getAsync()->startTransaction(std::move(params));
+        __android_log_print(ANDROID_LOG_DEBUG, "DEX_JNI", "acceptDexOrder: startTransaction posted OK");
+    } catch (const std::exception& e) {
+        __android_log_print(ANDROID_LOG_ERROR, "DEX_JNI", "acceptDexOrder: EXCEPTION: %s", e.what());
+    }
 }
 #endif  // BEAM_ASSET_SWAP_SUPPORT
 
