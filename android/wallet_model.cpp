@@ -1076,7 +1076,7 @@ void WalletModel::onDexOrdersChanged(ChangeAction action, const std::vector<DexO
         const auto& o = orders[i];
         if (i > 0) json += ",";
         json += "{";
-        json += "\"orderID\":\"" + to_hex(o.getID().m_pData, o.getID().nBytes) + "\",";
+        json += "\"orderID\":\"" + to_hex(o.getID().data(), o.getID().size()) + "\",";
         json += "\"sbbsID\":\"" + to_string(o.getSBBSID()) + "\",";
         json += "\"assetIdFirst\":" + std::to_string(o.getFirstAssetId()) + ",";
         json += "\"assetIdSecond\":" + std::to_string(o.getSecondAssetId()) + ",";
