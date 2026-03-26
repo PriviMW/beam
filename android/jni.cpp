@@ -1236,6 +1236,109 @@ JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(contractInfoRejected)(JNIEnv *
     webAPICreator->_api->contractInfoRejected(request);
 }
 
+#ifdef BEAM_ASSET_SWAP_SUPPORT
+#include "wallet/client/extensions/dex_board/dex_order.h"
+#include "wallet/transactions/dex/dex_tx.h"
+
+JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(getDexOrders)(JNIEnv *env, jobject thiz)
+{
+    BEAM_LOG_DEBUG() << "getDexOrders()";
+    walletModel->getAsync()->getDexOrders();
+}
+
+JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(loadDexOrderParams)(JNIEnv *env, jobject thiz)
+{
+    BEAM_LOG_DEBUG() << "loadDexOrderParams()";
+    walletModel->getAsync()->loadDexOrderParams();
+}
+
+JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(publishDexOrder)(JNIEnv *env, jobject thiz,
+    jstring jsbbsAddr, jlong sbbsKeyIdx,
+    jint sendAssetId, jlong sendAmount, jstring jsendSname,
+    jint receiveAssetId, jlong receiveAmount, jstring jreceiveSname,
+    jint expireMinutes)
+{
+    BEAM_LOG_DEBUG() << "publishDexOrder()";
+
+    auto sbbsAddrStr = JString(env, jsbbsAddr).value();
+    auto sendSname = JString(env, jsendSname).value();
+    auto receiveSname = JString(env, jreceiveSname).value();
+
+    beam::wallet::WalletID sbbsId;
+    if (!sbbsId.FromHex(sbbsAddrStr))
+    {
+        BEAM_LOG_WARNING() << "publishDexOrder: invalid SBBS address";
+        return;
+    }
+
+    beam::wallet::DexOrder order(
+        beam::wallet::DexOrderID::generate(),
+        sbbsId,
+        static_cast<uint64_t>(sbbsKeyIdx),
+        static_cast<beam::Asset::ID>(sendAssetId),
+        static_cast<beam::Amount>(sendAmount),
+        sendSname,
+        static_cast<beam::Asset::ID>(receiveAssetId),
+        static_cast<beam::Amount>(receiveAmount),
+        receiveSname,
+        static_cast<uint32_t>(expireMinutes)
+    );
+
+    walletModel->getAsync()->publishDexOrder(order);
+}
+
+JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(cancelDexOrder)(JNIEnv *env, jobject thiz, jstring jorderId)
+{
+    BEAM_LOG_DEBUG() << "cancelDexOrder()";
+    auto orderIdHex = JString(env, jorderId).value();
+
+    beam::wallet::DexOrderID orderId;
+    if (orderId.FromHex(orderIdHex))
+    {
+        walletModel->getAsync()->cancelDexOrder(orderId);
+    }
+    else
+    {
+        BEAM_LOG_WARNING() << "cancelDexOrder: invalid order ID hex";
+    }
+}
+
+JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(acceptDexOrder)(JNIEnv *env, jobject thiz,
+    jstring jorderId, jstring jsbbsId, jint sendAssetId, jlong sendAmount, jint receiveAssetId, jlong receiveAmount, jlong fee)
+{
+    BEAM_LOG_DEBUG() << "acceptDexOrder()";
+    auto orderIdHex = JString(env, jorderId).value();
+    auto sbbsIdStr = JString(env, jsbbsId).value();
+
+    beam::wallet::DexOrderID orderId;
+    beam::wallet::WalletID sbbsId;
+
+    if (!orderId.FromHex(orderIdHex))
+    {
+        BEAM_LOG_WARNING() << "acceptDexOrder: invalid order ID";
+        return;
+    }
+
+    if (!sbbsId.FromHex(sbbsIdStr))
+    {
+        BEAM_LOG_WARNING() << "acceptDexOrder: invalid SBBS ID";
+        return;
+    }
+
+    auto params = beam::wallet::CreateDexTransactionParams(
+        orderId,
+        sbbsId,
+        static_cast<beam::Asset::ID>(sendAssetId),
+        static_cast<beam::Amount>(sendAmount),
+        static_cast<beam::Asset::ID>(receiveAssetId),
+        static_cast<beam::Amount>(receiveAmount),
+        static_cast<beam::Amount>(fee)
+    );
+
+    walletModel->getAsync()->startTransaction(std::move(params));
+}
+#endif  // BEAM_ASSET_SWAP_SUPPORT
+
 JNIEXPORT jint JNICALL JNI_OnLoad(JavaVM* vm, void* reserved)
 {
     JNIEnv *env;
