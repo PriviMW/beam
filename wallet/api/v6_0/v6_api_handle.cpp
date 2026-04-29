@@ -505,7 +505,8 @@ namespace beam::wallet
             }
 
             auto params = CreateSplitTransactionParameters(data.coins, data.txId)
-                    .SetParameter(TxParameterID::Fee, data.fee);
+                    .SetParameter(TxParameterID::Fee, data.fee)
+                    .SetParameter(TxParameterID::IsSelfTx, true);
 
             if (data.assetId)
             {
