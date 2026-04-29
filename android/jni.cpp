@@ -1226,6 +1226,12 @@ JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(callWalletApi)(JNIEnv *env, jo
     webAPICreator->_api->callWalletApi(request);
 }
 
+JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(callWalletApiDirect)(JNIEnv *env, jobject thiz, jstring json)
+{
+    auto request = JString(env, json).value();
+    webAPICreator->_api->AnyThread_callWalletApiDirectly(request);
+}
+
 JNIEXPORT void JNICALL BEAM_JAVA_WALLET_INTERFACE(contractInfoApproved)(JNIEnv *env, jobject thiz, jstring json)
 {
     auto request = JString(env, json).value();
