@@ -68,7 +68,7 @@ namespace beam::wallet
 
         // Support both JSON array [0,123,255,...] and base64 string for "data" param.
         // Base64 is more memory-efficient for large files on mobile.
-        if (params.contains("data"))
+        if (params.count("data") > 0)
         {
             const auto& dataParam = params["data"];
             if (dataParam.is_array())
