@@ -22,6 +22,10 @@ env:
 jobs:
   build_android:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
     strategy:
       matrix:
         abi: [arm64-v8a]
@@ -162,11 +166,35 @@ jobs:
           # Copy Go IPFS shared library next to wallet-jni for packaging
           cp 3rdparty/asio-ipfs/ipfs_bindings/libipfs-bindings.so android/
 
+      - name: Compute SHA-256
+        run: |
+          cd android
+          sha256sum libwallet-jni.so libipfs-bindings.so | tee SHA256SUMS
+
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            android/libwallet-jni.so
+            android/libipfs-bindings.so
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: jni-${{ env.BEAM_VERSION }}-${{ github.sha }}
+          name: Android JNI ${{ env.BEAM_VERSION }} (${{ matrix.abi }})
+          files: |
+            android/libwallet-jni.so
+            android/libipfs-bindings.so
+            android/SHA256SUMS
+          generate_release_notes: true
+
       - uses: actions/upload-artifact@v4
         with:
           name: libwallet-jni-${{matrix.abi}}-${{env.BEAM_VERSION}}
           path: |
             android/libwallet-jni.so
             android/libipfs-bindings.so
+            android/SHA256SUMS
           if-no-files-found: error
           retention-days: 90
