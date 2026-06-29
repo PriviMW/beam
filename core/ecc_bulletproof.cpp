@@ -173,6 +173,25 @@ namespace ECC {
 		struct XSet
 		{
 			Scalar::Native m_Val[nCycles];
+
+			void NextChallenge(Oracle& oracle, const InnerProduct& ip, uint32_t iCycle, uint32_t iVersion)
+			{
+				const auto* pLR = ip.m_pLR[iCycle];
+
+				if (iVersion)
+					ExposeLR(oracle, pLR);
+
+				oracle >> m_Val[iCycle];
+
+				if (!iVersion)
+					ExposeLR(oracle, pLR);
+			}
+
+			static void ExposeLR(Oracle& oracle, const ECC::Point* pLR)
+			{
+				for (int j = 0; j < 2; j++)
+					oracle << pLR[j];
+			}
 		};
 
 		struct ChallengeSet {
@@ -188,15 +207,12 @@ namespace ECC {
 		void CycleStart(Oracle& oracle)
 		{
 			m_n = nDim >> (m_iCycle + 1);
-
-			oracle >> m_Cs.m_pX[0].m_Val[m_iCycle];
-			m_Cs.m_pX[1].m_Val[m_iCycle].SetInv(m_Cs.m_pX[0].m_Val[m_iCycle]);
 		}
 
-		void CycleExpose(Oracle& oracle, const InnerProduct& ip)
+		void CycleExpose(Oracle& oracle, const InnerProduct& ip, uint32_t iVersion)
 		{
-			for (int j = 0; j < 2; j++)
-				oracle << ip.m_pLR[m_iCycle][j];
+			m_Cs.m_pX[0].NextChallenge(oracle, ip, m_iCycle, iVersion);
+			m_Cs.m_pX[1].m_Val[m_iCycle].SetInv(m_Cs.m_pX[0].m_Val[m_iCycle]);
 		}
 
 		void CycleEnd()
@@ -225,7 +241,6 @@ namespace ECC {
 	struct InnerProduct::Calculator
 		:public CalculatorBase
 	{
-
 		struct Aggregator
 		{
 			MultiMac& m_Mm;
@@ -408,18 +423,18 @@ namespace ECC {
 		}
 	}
 
-	void InnerProduct::Create(Point::Native& commAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& mod)
+	void InnerProduct::Create(uint32_t iVersion, Point::Native& commAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& mod)
 	{
 		Oracle oracle;
-		Create(oracle, &commAB, dotAB, pA, pB, mod);
+		Create(iVersion, oracle, &commAB, dotAB, pA, pB, mod);
 	}
 
-	void InnerProduct::Create(Oracle& oracle, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& mod)
+	void InnerProduct::Create(uint32_t iVersion, Oracle& oracle, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& mod)
 	{
-		Create(oracle, NULL, dotAB, pA, pB, mod);
+		Create(iVersion, oracle, nullptr, dotAB, pA, pB, mod);
 	}
 
-	void InnerProduct::Create(Oracle& oracle, Point::Native* pAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& mod)
+	void InnerProduct::Create(uint32_t iVersion, Oracle& oracle, Point::Native* pAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& mod)
 	{
 		Mode::Scope scope(Mode::Fast);
 
@@ -460,7 +475,7 @@ namespace ECC {
 				m_pLR[c.m_iCycle][j] = comm;
 			}
 
-			c.CycleExpose(oracle, *this);
+			c.CycleExpose(oracle, *this, iVersion);
 
 			c.Condense();
 
@@ -471,14 +486,14 @@ namespace ECC {
 			m_pCondensed[i] = c.m_pVal[i][0];
 	}
 
-	bool InnerProduct::IsValid(const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& mod) const
+	bool InnerProduct::IsValid(uint32_t iVersion, const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& mod) const
 	{
 		if (BatchContext::s_pInstance)
-			return IsValid(*BatchContext::s_pInstance, commAB, dotAB, mod);
+			return IsValid(iVersion, *BatchContext::s_pInstance, commAB, dotAB, mod);
 
 		BatchContextEx<1> bc;
 		return
-			IsValid(bc, commAB, dotAB, mod) &&
+			IsValid(iVersion, bc, commAB, dotAB, mod) &&
 			bc.Flush();
 	}
 
@@ -489,20 +504,17 @@ namespace ECC {
 
 		Scalar::Native m_Mul1, m_Mul2;
 
-		void Init(Oracle& oracle, const Scalar::Native& dotAB, const InnerProduct& v)
+		void Init(uint32_t iVersion, Oracle& oracle, const Scalar::Native& dotAB, const InnerProduct& v)
 		{
 			oracle << dotAB >> m_DotMultiplier;
 			m_Mul1 = 1U;
 
 			for (uint32_t iCycle = 0; iCycle < nCycles; iCycle++)
 			{
-				oracle >> m_X.m_Val[iCycle];
+				m_X.NextChallenge(oracle, v, iCycle, iVersion);
 
 				m_Mul1 *= m_X.m_Val[iCycle];
 				m_X.m_Val[iCycle] *= m_X.m_Val[iCycle];
-
-				for (int j = 0; j < 2; j++)
-					oracle << v.m_pLR[iCycle][j];
 			}
 
 			m_Mul2 = m_Mul1;
@@ -510,7 +522,7 @@ namespace ECC {
 		}
 	};
 
-	bool InnerProduct::IsValid(BatchContext& bc, const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& mod) const
+	bool InnerProduct::IsValid(uint32_t iVersion, BatchContext& bc, const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& mod) const
 	{
 		Mode::Scope scope(Mode::Fast);
 
@@ -518,7 +530,7 @@ namespace ECC {
 		oracle << commAB;
 
 		Challenges cs_;
-		cs_.Init(oracle, dotAB, *this);
+		cs_.Init(iVersion, oracle, dotAB, *this);
 
 		bc.EquationBegin();
 		bc.AddCasual(commAB, cs_.m_Mul2);
@@ -627,13 +639,13 @@ namespace ECC {
 
 	/////////////////////
 	// Bulletproof
-	void RangeProof::Confidential::Create(const Scalar::Native& sk, const Params::Create& cp, Oracle& oracle, const Point::Native* pHGen /* = nullptr */)
+	void RangeProof::Confidential::Create(const Scalar::Native& sk, const Params::Create& cp, uint32_t iVersion, Oracle& oracle, const Point::Native* pHGen /* = nullptr */)
 	{
 		NoLeak<uintBig> seedSk;
         GenerateSeed(seedSk.V, sk, cp.m_Value, oracle);
 
 		Nonces nonces(seedSk.V);
-        BEAM_VERIFY(CoSign(nonces, sk, cp, oracle, Phase::SinglePass, pHGen));
+        BEAM_VERIFY(CoSign(nonces, sk, cp, iVersion, oracle, Phase::SinglePass, pHGen));
 	}
 
     void RangeProof::Confidential::GenerateSeed(uintBig& seedSk, const Scalar::Native& sk, Amount amount, Oracle& oracle)
@@ -742,7 +754,7 @@ namespace ECC {
 	};
 #pragma pack (pop)
 
-	bool RangeProof::Confidential::CoSign(const Nonces& nonces, const Scalar::Native& sk, const Params::Create& cp, Oracle& oracle, Phase::Enum ePhase, const Point::Native* pHGen /* = nullptr */)
+	bool RangeProof::Confidential::CoSign(const Nonces& nonces, const Scalar::Native& sk, const Params::Create& cp, uint32_t iVersion, Oracle& oracle, Phase::Enum ePhase, const Point::Native* pHGen /* = nullptr */)
 	{
 		NonceGeneratorBp nonceGen(cp.m_Seed.V);
 
@@ -922,7 +934,7 @@ namespace ECC {
 		InnerProduct::Modifier mod;
 		mod.m_ppC[1] = &ch1;
 
-		m_P_Tag.Create(oracle, l0, vecs.m_pS[0], vecs.m_pS[1], mod);
+		m_P_Tag.Create(iVersion, oracle, l0, vecs.m_pS[0], vecs.m_pS[1], mod);
 
 		return true;
 	}
@@ -954,7 +966,7 @@ namespace ECC {
 		res = comm;
 	}
 
-	bool RangeProof::Confidential::Recover(Oracle& oracle, Params::Recover& cp) const
+	bool RangeProof::Confidential::Recover(uint32_t iVersion, Oracle& oracle, Params::Recover& cp) const
 	{
 		NonceGeneratorBp nonceGen(cp.m_Seed.V);
 
@@ -1038,7 +1050,7 @@ namespace ECC {
 			for (c.m_iCycle = 0; c.m_iCycle < InnerProduct::nCycles; c.m_iCycle++)
 			{
 				c.CycleStart(oracle);
-				c.CycleExpose(oracle, m_P_Tag);
+				c.CycleExpose(oracle, m_P_Tag, iVersion);
 				c.CondenseBase();
 				c.CycleEnd();
 			}
@@ -1145,18 +1157,18 @@ namespace ECC {
 		oracle >> x;
 	}
 
-	bool RangeProof::Confidential::IsValid(const Point::Native& commitment, Oracle& oracle, const Point::Native* pHGen /* = nullptr */) const
+	bool RangeProof::Confidential::IsValid(const Point::Native& commitment, uint32_t iVersion, Oracle& oracle, const Point::Native* pHGen /* = nullptr */) const
 	{
 		if (InnerProduct::BatchContext::s_pInstance)
-			return IsValid(commitment, oracle, *InnerProduct::BatchContext::s_pInstance, pHGen);
+			return IsValid(commitment, iVersion, oracle, *InnerProduct::BatchContext::s_pInstance, pHGen);
 
 		InnerProduct::BatchContextEx<1> bc;
 		return
-			IsValid(commitment, oracle, bc, pHGen) &&
+			IsValid(commitment, iVersion, oracle, bc, pHGen) &&
 			bc.Flush();
 	}
 
-	bool RangeProof::Confidential::IsValid(const Point::Native& commitment, Oracle& oracle, InnerProduct::BatchContext& bc, const Point::Native* pHGen /* = nullptr */) const
+	bool RangeProof::Confidential::IsValid(const Point::Native& commitment, uint32_t iVersion, Oracle& oracle, InnerProduct::BatchContext& bc, const Point::Native* pHGen /* = nullptr */) const
 	{
 		bool bCustom = Tag::IsCustom(pHGen);
 
@@ -1231,7 +1243,7 @@ namespace ECC {
 		bc.m_Multiplier *= yPwrMax;
 
 		InnerProduct::Challenges cs_;
-		cs_.Init(oracle, tDot, m_P_Tag);
+		cs_.Init(iVersion, oracle, tDot, m_P_Tag);
 
 		cs.z *= cs_.m_Mul2;
 

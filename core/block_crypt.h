@@ -597,6 +597,11 @@ namespace beam
 				Exc::Fail("CA disabled");
 		}
 
+		uint32_t get_BpScheme(Height h) const
+		{
+			return IsPastFork_<6>(h) ? 1 : 0;
+		}
+
 		void TestEnabledShielded() const
 		{
 			if (!Shielded.Enabled)

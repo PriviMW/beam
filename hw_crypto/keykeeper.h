@@ -386,6 +386,7 @@ void KeyKeeper_GetPKdf(const KeyKeeper*, KdfPub*, const uint32_t* pChild); // if
 	macro(CompactPoint, ptAssetGen) \
 	macro(uint8_t, UsePublicGen) \
 	macro(uint8_t, HideAssetAlways) /* important to specify, this affects expected blinding factor recovery */ \
+	macro(uint8_t, iVersion) \
 
 #define BeamCrypto_ProtoResponse_TxSendShielded(macro) \
 	macro(TxCommonOut, Tx) \

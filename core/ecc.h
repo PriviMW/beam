@@ -341,13 +341,13 @@ namespace ECC
 			}
 		};
 
-		void Create(Point::Native& commAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& = Modifier());
-		bool IsValid(const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& = Modifier()) const;
+		void Create(uint32_t iVersion, Point::Native& commAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& = Modifier());
+		bool IsValid(uint32_t iVersion, const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& = Modifier()) const;
 
 		struct BatchContext;
 		template <uint32_t nBatchSize> struct BatchContextEx;
 
-		void Create(Oracle&, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& = Modifier());
+		void Create(uint32_t iVersion, Oracle&, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier& = Modifier());
 
 		struct Challenges;
 		bool IsValid(BatchContext&, Challenges&, const Scalar::Native& dotAB, const Modifier& = Modifier()) const;
@@ -356,8 +356,8 @@ namespace ECC
 	private:
 		struct Calculator;
 
-		void Create(Oracle&, Point::Native* pAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier&);
-		bool IsValid(BatchContext&, const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& mod) const;
+		void Create(uint32_t iVersion, Oracle&, Point::Native* pAB, const Scalar::Native& dotAB, const Scalar::Native* pA, const Scalar::Native* pB, const Modifier&);
+		bool IsValid(uint32_t iVersion, BatchContext&, const Point::Native& commAB, const Scalar::Native& dotAB, const Modifier& mod) const;
 	};
 
 	namespace RangeProof
@@ -432,11 +432,11 @@ namespace ECC
 			//		In case of multi-sig it should be specified explicitly by the caller (the resulting nonce must be the same for multiple invocations).
 			//			Means - the caller must take care of constructing the nonce, which has external randomness
 
-			void Create(const Scalar::Native& sk, const Params::Create&, Oracle&, const Point::Native* pHGen = nullptr); // single-pass
-			bool IsValid(const Point::Native&, Oracle&, const Point::Native* pHGen = nullptr) const;
-			bool IsValid(const Point::Native&, Oracle&, InnerProduct::BatchContext&, const Point::Native* pHGen = nullptr) const;
+			void Create(const Scalar::Native& sk, const Params::Create&, uint32_t iVersion, Oracle&, const Point::Native* pHGen = nullptr); // single-pass
+			bool IsValid(const Point::Native&, uint32_t iVersion, Oracle&, const Point::Native* pHGen = nullptr) const;
+			bool IsValid(const Point::Native&, uint32_t iVersion, Oracle&, InnerProduct::BatchContext&, const Point::Native* pHGen = nullptr) const;
 
-			bool Recover(Oracle&, Params::Recover&) const;
+			bool Recover(uint32_t iVersion, Oracle&, Params::Recover&) const;
 
 			int cmp(const Confidential&) const;
 			COMPARISON_VIA_CMP
@@ -462,7 +462,7 @@ namespace ECC
 				};
 			};
 
-			bool CoSign(const Nonces&, const Scalar::Native& sk, const Params::Create&, Oracle&, Phase::Enum, const Point::Native* pHGen = nullptr);
+			bool CoSign(const Nonces&, const Scalar::Native& sk, const Params::Create&, uint32_t iVersion, Oracle&, Phase::Enum, const Point::Native* pHGen = nullptr);
 
             static void GenerateSeed(uintBig& seedSk, const Scalar::Native& sk, Amount amount, Oracle& oracle);
 

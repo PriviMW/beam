@@ -466,7 +466,7 @@ namespace beam
 			if (m_pPublic)
 				return false;
 
-			return m_pConfidential->IsValid(comm, oracle, pGen);
+			return m_pConfidential->IsValid(comm, Rules::get().get_BpScheme(hScheme), oracle, pGen);
 		}
 
 		if (!m_pPublic)
@@ -596,8 +596,9 @@ namespace beam
 				cp.m_pExtra = pKExtra;
 			}
 
+			auto iVersion = Rules::get().get_BpScheme(hScheme);
 			if (bUseCoinKdf)
-				m_pConfidential->Create(skSign, cp, oracle, &wrk.m_hGen);
+				m_pConfidential->Create(skSign, cp, iVersion, oracle, &wrk.m_hGen);
 			else
 			{
 				ECC::RangeProof::Confidential::Nonces nonces; // not required, leave it zero (set in c'tor)
@@ -605,12 +606,12 @@ namespace beam
 				if (OpCode::Mpc_1 == eOp)
 				{
 					ZeroObject(m_pConfidential->m_Part2);
-					m_pConfidential->CoSign(nonces, skSign, cp, oracle, ECC::RangeProof::Confidential::Phase::Step2, &wrk.m_hGen); // stop after Part2
+					m_pConfidential->CoSign(nonces, skSign, cp, iVersion, oracle, ECC::RangeProof::Confidential::Phase::Step2, &wrk.m_hGen); // stop after Part2
 				}
 				else
 				{
 					// by now Part2 and Part3 
-					m_pConfidential->CoSign(nonces, skSign, cp, oracle, ECC::RangeProof::Confidential::Phase::Finalize, &wrk.m_hGen);
+					m_pConfidential->CoSign(nonces, skSign, cp, iVersion, oracle, ECC::RangeProof::Confidential::Phase::Finalize, &wrk.m_hGen);
 				}
 			}
 		}
@@ -655,7 +656,7 @@ namespace beam
 			if (pUser)
 				cp.m_pExtra = pKExtra;
 
-			if (!m_pConfidential->Recover(oracle, cp))
+			if (!m_pConfidential->Recover(Rules::get().get_BpScheme(hScheme), oracle, cp))
 				return false;
 
 			Cast::Down<Key::ID>(cid) = kida.m_Kid;

@@ -160,6 +160,7 @@ using namespace beam;
 int g_TestsFailed = 0;
 
 const Height g_hFork = 3; // whatever
+const Height g_hFork6 = 1000;
 
 void TestFailed(const char* szExpr, uint32_t nLine)
 {
@@ -933,7 +934,7 @@ struct KeyKeeperWrap
 	static CoinID& Add(std::vector<CoinID>& vec, Amount val = 0);
 	static wallet::IPrivateKeyKeeper2::ShieldedInput& AddSh(std::vector<wallet::IPrivateKeyKeeper2::ShieldedInput>& vec, Amount val, Amount nFee);
 
-	void ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::Method::TxCommon& tx2);
+	Height ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::Method::TxCommon& tx2);
 	void TestTx(const wallet::IPrivateKeyKeeper2::Method::TxCommon& tx2);
 
 	void TestSplit();
@@ -1143,7 +1144,7 @@ wallet::IPrivateKeyKeeper2::ShieldedInput& KeyKeeperWrap::AddSh(std::vector<wall
 	return ret;
 }
 
-void KeyKeeperWrap::ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::Method::TxCommon& tx2)
+Height KeyKeeperWrap::ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::Method::TxCommon& tx2)
 {
 	tx.m_vInputs.reserve(tx.m_vInputs.size() + tx2.m_vInputs.size());
 
@@ -1162,10 +1163,12 @@ void KeyKeeperWrap::ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::
 
 	tx.m_vOutputs.reserve(tx.m_vOutputs.size() + tx2.m_vOutputs.size());
 
+	Height hScheme = tx2.m_pKernel ? tx2.m_pKernel->m_Height.m_Min : g_hFork;
+
 	for (unsigned int i = 0; i < tx2.m_vOutputs.size(); i++)
 	{
 		KeyKeeperHwEmu::Method::CreateOutput m;
-		m.m_hScheme = g_hFork;
+		m.m_hScheme = hScheme;
 		m.m_Cid = tx2.m_vOutputs[i];
 		ECC::GenRandom(m.m_User.m_pExtra[0].m_Value);
 		ECC::GenRandom(m.m_User.m_pExtra[1].m_Value);
@@ -1175,13 +1178,13 @@ void KeyKeeperWrap::ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::
 
 		CoinID cid;
 		Output::User usr;
-		verify_test(m.m_pResult->Recover(g_hFork, m_kkStd.get_Owner(), cid, &usr));
+		verify_test(m.m_pResult->Recover(hScheme, m_kkStd.get_Owner(), cid, &usr));
 		verify_test(cid == m.m_Cid);
 		verify_test(usr.m_pExtra[0] == m.m_User.m_pExtra[0]);
 		verify_test(usr.m_pExtra[1] == m.m_User.m_pExtra[1]);
 
 		ECC::Point::Native comm;
-		verify_test(m.m_pResult->IsValid(g_hFork, comm));
+		verify_test(m.m_pResult->IsValid(hScheme, comm));
 
 		tx.m_vOutputs.emplace_back().swap(m.m_pResult);
 	}
@@ -1235,17 +1238,18 @@ void KeyKeeperWrap::ExportTx(Transaction& tx, const wallet::IPrivateKeyKeeper2::
 
 	// offset
 	tx.m_Offset = tx2.m_kOffset;
-
 	tx.Normalize();
+
+	return hScheme;
 }
 
 void KeyKeeperWrap::TestTx(const wallet::IPrivateKeyKeeper2::Method::TxCommon& tx2)
 {
 	Transaction tx;
-	ExportTx(tx, tx2);
+	Height hMin = ExportTx(tx, tx2);
 
 	Transaction::Context ctx;
-	ctx.m_Height.m_Min = g_hFork;
+	ctx.m_Height.m_Min = hMin;
 	verify_test(tx.IsValid(ctx));
 }
 
@@ -1537,9 +1541,11 @@ void TestShielded()
 		else
 			m.m_pVoucher = std::make_unique<ShieldedTxo::Voucher>(vVouchers.front());
 
+		Height hScheme = (4 & i) ? g_hFork6 : g_hFork;
+
 		m.m_pKernel = std::make_unique<TxKernelStd>();
-		m.m_pKernel->m_Height.m_Min = g_hFork;
-		m.m_pKernel->m_Height.m_Max = g_hFork + 40;
+		m.m_pKernel->m_Height.m_Min = hScheme;
+		m.m_pKernel->m_Height.m_Max = hScheme + 40;
 		m.m_pKernel->m_Fee = 1100000; // net value transfer is 5 groth
 
 		kkw.Add(m.m_vInputs, m.m_pKernel->m_Fee);
@@ -1658,9 +1664,8 @@ int main()
 	beam::Rules::Scope scopeRules(r);
 
 	r.CA.Enabled = true;
-	r.pForks[1].m_Height = g_hFork;
-	r.pForks[2].m_Height = g_hFork;
-	r.pForks[3].m_Height = g_hFork;
+	r.SetForksFrom(1, g_hFork);
+	r.SetForksFrom(6, g_hFork6);
 
 	io::Reactor::Ptr pReactor(io::Reactor::create());
 	io::Reactor::Scope scope(*pReactor);
