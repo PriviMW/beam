@@ -2414,6 +2414,7 @@ namespace beam
 			pForks[3].m_Height = 1280000;
 			pForks[4].m_Height = 1820000;
 			pForks[5].m_Height = 1920000;
+			pForks[6].m_Height = 3928666;
 
 			Magic.v0 = 14;
 			DA.Difficulty0 = Difficulty(22 << Difficulty::s_MantissaBits); // 2^22 = 4,194,304. For GPUs producing 7 sol/sec this is roughly equivalent to 10K GPUs.
