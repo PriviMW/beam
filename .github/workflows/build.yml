@@ -1,6 +1,12 @@
 name: Build
 
-on: [push]
+# Restricted to master pushes so dev branches (merge-hf6, etc.) and tags
+# do not trigger a full desktop+wasm+ios+android build. The Android JNI
+# lib for privimw-wallet is built by .github/workflows/build-android-jni.yml.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
 
 permissions:
   id-token: write
