@@ -846,8 +846,10 @@ struct AssetTag
 	}
 };
 
-void TestRangeProof(bool bCustomTag)
+void TestRangeProof(bool bCustomTag, beam::Height hScheme)
 {
+	uint32_t iVersion = beam::Rules::get().get_BpScheme(hScheme);
+
 	RangeProof::Params::Create cp;
 
 	beam::uintBig_t<sizeof(Key::ID::Packed)> up0, up1;
@@ -941,11 +943,11 @@ void TestRangeProof(bool bCustomTag)
 	mod.m_ppC[1] = &ch1;
 
 	InnerProduct sig;
-	sig.Create(comm, dot, pA, pB, mod);
+	sig.Create(iVersion, comm, dot, pA, pB, mod);
 
 	InnerProduct::get_Dot(dot, pA, pB);
 
-	verify_test(sig.IsValid(comm, dot, mod));
+	verify_test(sig.IsValid(iVersion, comm, dot, mod));
 
 	RangeProof::Confidential bp;
 	cp.m_Value = 23110;
@@ -958,11 +960,11 @@ void TestRangeProof(bool bCustomTag)
 
 	{
 		Oracle oracle;
-		bp.Create(sk, cp, oracle, &tag.m_hGen);
+		bp.Create(sk, cp, iVersion, oracle, &tag.m_hGen);
 	}
 	{
 		Oracle oracle;
-		verify_test(bp.IsValid(comm, oracle, &tag.m_hGen));
+		verify_test(bp.IsValid(comm, iVersion, oracle, &tag.m_hGen));
 	}
 	{
 		Oracle oracle;
@@ -970,7 +972,7 @@ void TestRangeProof(bool bCustomTag)
 		cp2.m_Seed = cp.m_Seed;
 		cp2.m_Blob = uc1;
 
-		verify_test(bp.Recover(oracle, cp2));
+		verify_test(bp.Recover(iVersion, oracle, cp2));
 		verify_test(uc0 == uc1);
 
 		// leave only data needed for recovery
@@ -981,7 +983,7 @@ void TestRangeProof(bool bCustomTag)
 		ZeroObject(bp2.m_P_Tag);
 
 		oracle = Oracle();
-		verify_test(bp2.Recover(oracle, cp2));
+		verify_test(bp2.Recover(iVersion, oracle, cp2));
 		verify_test(uc0 == uc1);
 	}
 
@@ -993,11 +995,11 @@ void TestRangeProof(bool bCustomTag)
 	{
 		Oracle oracle;
 		cp.m_pExtra = pEx;
-		bp.CoSign(seedSk, sk, cp, oracle, RangeProof::Confidential::Phase::SinglePass, &tag.m_hGen);
+		bp.CoSign(seedSk, sk, cp, iVersion, oracle, RangeProof::Confidential::Phase::SinglePass, &tag.m_hGen);
 	}
 	{
 		Oracle oracle;
-		verify_test(bp.IsValid(comm, oracle, &tag.m_hGen));
+		verify_test(bp.IsValid(comm, iVersion, oracle, &tag.m_hGen));
 	}
 	{
 		Oracle oracle;
@@ -1011,7 +1013,7 @@ void TestRangeProof(bool bCustomTag)
 		cp2.m_pSk = &sk2;
 		cp2.m_pExtra = pExVer;
 
-		verify_test(bp.Recover(oracle, cp2));
+		verify_test(bp.Recover(iVersion, oracle, cp2));
 		verify_test(uc0 == uc1);
 		verify_test(sk == sk2);
 		verify_test((pEx[0] == pExVer[0]) && (pEx[1] == pExVer[1]));
@@ -1021,7 +1023,7 @@ void TestRangeProof(bool bCustomTag)
 
 	{
 		Oracle oracle;
-		verify_test(bp.IsValid(comm, oracle, bc, &tag.m_hGen)); // add to batch
+		verify_test(bp.IsValid(comm, iVersion, oracle, bc, &tag.m_hGen)); // add to batch
 	}
 
 	SetRandom(sk);
@@ -1031,11 +1033,11 @@ void TestRangeProof(bool bCustomTag)
 
 	{
 		Oracle oracle;
-		bp.Create(sk, cp, oracle, &tag.m_hGen);
+		bp.Create(sk, cp, iVersion, oracle, &tag.m_hGen);
 	}
 	{
 		Oracle oracle;
-		verify_test(bp.IsValid(comm, oracle, bc, &tag.m_hGen)); // add to batch
+		verify_test(bp.IsValid(comm, iVersion, oracle, bc, &tag.m_hGen)); // add to batch
 	}
 
 	verify_test(bc.Flush()); // verify at once
@@ -1072,7 +1074,7 @@ void TestRangeProof(bool bCustomTag)
 			{
 				Oracle oracle;
 				bp.m_Part2 = p2;
-				verify_test(bp.CoSign(pSeed[i], pSk[i], cp, oracle, RangeProof::Confidential::Phase::Step2, &tag.m_hGen)); // add last p2, produce msig
+				verify_test(bp.CoSign(pSeed[i], pSk[i], cp, iVersion, oracle, RangeProof::Confidential::Phase::Step2, &tag.m_hGen)); // add last p2, produce msig
 				p2 = bp.m_Part2;
 
 				msig.m_Part1 = bp.m_Part1;
@@ -1094,7 +1096,7 @@ void TestRangeProof(bool bCustomTag)
 			{
 				bp.m_Part2 = p2;
 				bp.m_Part3 = p3;
-				verify_test(bp.CoSign(pSeed[i], pSk[i], cp, oracle, RangeProof::Confidential::Phase::Finalize, &tag.m_hGen));
+				verify_test(bp.CoSign(pSeed[i], pSk[i], cp, iVersion, oracle, RangeProof::Confidential::Phase::Finalize, &tag.m_hGen));
 			}
 		}
 
@@ -1102,7 +1104,7 @@ void TestRangeProof(bool bCustomTag)
 		{
 			// test
 			Oracle oracle;
-			verify_test(bp.IsValid(comm, oracle, &tag.m_hGen));
+			verify_test(bp.IsValid(comm, iVersion, oracle, &tag.m_hGen));
 		}
 	}
 
@@ -1118,12 +1120,12 @@ void TestRangeProof(bool bCustomTag)
 	{
 		beam::Output outp;
 		outp.m_Coinbase = true; // others may be disallowed
-		outp.Create(g_hFork, sk, kdf, cid, kdf, beam::Output::OpCode::Public);
-		verify_test(outp.IsValid(g_hFork, comm));
+		outp.Create(hScheme, sk, kdf, cid, kdf, beam::Output::OpCode::Public);
+		verify_test(outp.IsValid(hScheme, comm));
 		WriteSizeSerialized("Out-UTXO-Public", outp);
 
 		beam::SerializerSizeCounter ssc;
-		yas::detail::saveRecovery(ssc, outp, g_hFork);
+		yas::detail::saveRecovery(ssc, outp, hScheme);
 		PrintSizeSerialized("Out-UTXO-Public-RecoveryOnly", ssc);
 	}
 	{
@@ -1135,16 +1137,16 @@ void TestRangeProof(bool bCustomTag)
 			user.m_pExtra[i] = s;
 		}
 		beam::Output outp;
-		outp.Create(g_hFork, sk, kdf, cid, kdf, beam::Output::OpCode::Standard, &user);
-		verify_test(outp.IsValid(g_hFork, comm));
+		outp.Create(hScheme, sk, kdf, cid, kdf, beam::Output::OpCode::Standard, &user);
+		verify_test(outp.IsValid(hScheme, comm));
 		WriteSizeSerialized("Out-UTXO-Confidential", outp);
 
 		beam::SerializerSizeCounter ssc;
-		yas::detail::saveRecovery(ssc, outp, g_hFork);
+		yas::detail::saveRecovery(ssc, outp, hScheme);
 		PrintSizeSerialized("Out-UTXO-Confidential-RecoveryOnly", ssc);
 
 		CoinID cid2;
-		verify_test(outp.Recover(g_hFork, kdf, cid2, &user2));
+		verify_test(outp.Recover(hScheme, kdf, cid2, &user2));
 		verify_test(cid == cid2);
 
 		for (size_t i = 0; i < _countof(user.m_pExtra); i++)
@@ -1210,13 +1212,14 @@ void TestMultiSigOutput()
     verify_test(RangeProof::Confidential::MultiSig::CoSignPart(seedA, p2)); // p2 aggregation
 
     // B part2
+	uint32_t iVersion = beam::Rules::get().get_BpScheme(g_hFork);
 	RangeProof::Confidential::MultiSig multiSig;
 	{
         Oracle oracle(o0);
 		RangeProof::Confidential bulletproof;
 		bulletproof.m_Part2 = p2;
 
-        verify_test(bulletproof.CoSign(seedB, blindingFactorB, cp, oracle, RangeProof::Confidential::Phase::Step2)); // add last p2, produce msig
+        verify_test(bulletproof.CoSign(seedB, blindingFactorB, cp, iVersion, oracle, RangeProof::Confidential::Phase::Step2)); // add last p2, produce msig
 
 		multiSig.m_Part1 = bulletproof.m_Part1;
 		multiSig.m_Part2 = bulletproof.m_Part2;
@@ -1241,7 +1244,7 @@ void TestMultiSigOutput()
 		outp.m_pConfidential->m_Part3 = p3;
 
 		Oracle oracle(o0);
-		verify_test(outp.m_pConfidential->CoSign(seedB, blindingFactorB, cp, oracle, RangeProof::Confidential::Phase::Finalize));
+		verify_test(outp.m_pConfidential->CoSign(seedB, blindingFactorB, cp, iVersion, oracle, RangeProof::Confidential::Phase::Finalize));
     }
 
     {
@@ -2422,8 +2425,8 @@ void TestAll(beam::Rules& r)
 	TestPoints();
 	TestSigning();
 	TestCommitments();
-	TestRangeProof(false);
-	TestRangeProof(true);
+	TestRangeProof(false, 0);
+	TestRangeProof(true, g_hFork);
 	TestTransaction();
 	TestMultiSigOutput();
 	TestCutThrough();
@@ -2786,6 +2789,7 @@ void RunBenchmark()
 		SetRandom(pB[i]);
 	}
 
+	uint32_t iVersion = beam::Rules::get().get_BpScheme(g_hFork);
 	InnerProduct sig2;
 
 	Point::Native commAB;
@@ -2798,7 +2802,7 @@ void RunBenchmark()
 		do
 		{
 			for (uint32_t i = 0; i < bm.N; i++)
-				sig2.Create(commAB, dot, pA, pB);
+				sig2.Create(iVersion, commAB, dot, pA, pB);
 
 		} while (bm.ShouldContinue());
 	}
@@ -2809,7 +2813,7 @@ void RunBenchmark()
 		do
 		{
 			for (uint32_t i = 0; i < bm.N; i++)
-				sig2.IsValid(commAB, dot);
+				sig2.IsValid(iVersion, commAB, dot);
 
 		} while (bm.ShouldContinue());
 	}
@@ -2827,7 +2831,7 @@ void RunBenchmark()
 			for (uint32_t i = 0; i < bm.N; i++)
 			{
 				Oracle oracle;
-				bp.Create(k1, cp, oracle);
+				bp.Create(k1, cp, iVersion, oracle);
 			}
 
 		} while (bm.ShouldContinue());
@@ -2843,7 +2847,7 @@ void RunBenchmark()
 			for (uint32_t i = 0; i < bm.N; i++)
 			{
 				Oracle oracle;
-				bp.IsValid(comm, oracle);
+				bp.IsValid(comm, iVersion, oracle);
 			}
 
 		} while (bm.ShouldContinue());
@@ -2867,7 +2871,7 @@ void RunBenchmark()
 				for (uint32_t n = 0; n < nBatch; n++)
 				{
 					Oracle oracle;
-					bp.IsValid(comm, oracle);
+					bp.IsValid(comm, iVersion, oracle);
 				}
 
 				verify_test(p->Flush());

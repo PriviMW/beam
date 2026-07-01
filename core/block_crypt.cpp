@@ -466,7 +466,7 @@ namespace beam
 			if (m_pPublic)
 				return false;
 
-			return m_pConfidential->IsValid(comm, oracle, pGen);
+			return m_pConfidential->IsValid(comm, Rules::get().get_BpScheme(hScheme), oracle, pGen);
 		}
 
 		if (!m_pPublic)
@@ -596,8 +596,9 @@ namespace beam
 				cp.m_pExtra = pKExtra;
 			}
 
+			auto iVersion = Rules::get().get_BpScheme(hScheme);
 			if (bUseCoinKdf)
-				m_pConfidential->Create(skSign, cp, oracle, &wrk.m_hGen);
+				m_pConfidential->Create(skSign, cp, iVersion, oracle, &wrk.m_hGen);
 			else
 			{
 				ECC::RangeProof::Confidential::Nonces nonces; // not required, leave it zero (set in c'tor)
@@ -605,12 +606,12 @@ namespace beam
 				if (OpCode::Mpc_1 == eOp)
 				{
 					ZeroObject(m_pConfidential->m_Part2);
-					m_pConfidential->CoSign(nonces, skSign, cp, oracle, ECC::RangeProof::Confidential::Phase::Step2, &wrk.m_hGen); // stop after Part2
+					m_pConfidential->CoSign(nonces, skSign, cp, iVersion, oracle, ECC::RangeProof::Confidential::Phase::Step2, &wrk.m_hGen); // stop after Part2
 				}
 				else
 				{
 					// by now Part2 and Part3 
-					m_pConfidential->CoSign(nonces, skSign, cp, oracle, ECC::RangeProof::Confidential::Phase::Finalize, &wrk.m_hGen);
+					m_pConfidential->CoSign(nonces, skSign, cp, iVersion, oracle, ECC::RangeProof::Confidential::Phase::Finalize, &wrk.m_hGen);
 				}
 			}
 		}
@@ -655,7 +656,7 @@ namespace beam
 			if (pUser)
 				cp.m_pExtra = pKExtra;
 
-			if (!m_pConfidential->Recover(oracle, cp))
+			if (!m_pConfidential->Recover(Rules::get().get_BpScheme(hScheme), oracle, cp))
 				return false;
 
 			Cast::Down<Key::ID>(cid) = kida.m_Kid;
@@ -1909,7 +1910,7 @@ namespace beam
 
 	void Transaction::TestValid(Context& ctx) const
 	{
-		assert(!ctx.m_Params.m_bBlock);
+		assert(Kind::Tx == ctx.m_Params.m_Kind);
 		ctx.ValidateAndSummarizeStrict(*this, get_Reader());
 		ctx.TestSigma();
 	}
@@ -2413,6 +2414,7 @@ namespace beam
 			pForks[3].m_Height = 1280000;
 			pForks[4].m_Height = 1820000;
 			pForks[5].m_Height = 1920000;
+			pForks[6].m_Height = 3928666;
 
 			Magic.v0 = 14;
 			DA.Difficulty0 = Difficulty(22 << Difficulty::s_MantissaBits); // 2^22 = 4,194,304. For GPUs producing 7 sol/sec this is roughly equivalent to 10K GPUs.
@@ -2703,6 +2705,7 @@ namespace beam
 		oracle
 			<< "fork6"
 			<< pForks[6].m_Height
+			<< (uint32_t) 1 // fees in coinbase
 			<< Evm.Groth2Wei
 			<< Evm.BaseGasPrice
 			<< Evm.MinTxGasUnits
@@ -3645,17 +3648,35 @@ namespace beam
 		m_Offset = Zero;
 	}
 
-	void Block::Builder::AddCoinbaseAndKrn(Output::Ptr& pOutp, TxKernel::Ptr& pKrn)
+	void Block::Builder::AddCoinbaseAndKrn(Amount fees, Output::Ptr& pSubsidy, Output::Ptr& pFees, TxKernel::Ptr& pKrn)
 	{
+		const auto& r = Rules::get();
+		assert(Rules::Consensus::Pbft != r.m_Consensus);
+
+		Amount subsidy = r.get_Emission(m_Height);
+		if (r.IsPastFork_<6>(m_Height))
+		{
+			subsidy += fees; // don't care about overflow, block assembler should ensure this
+			fees = 0;
+		}
+
+		if (!(subsidy || fees))
+			return; // nothing to add
+
 		ECC::Scalar::Native sk;
 
-		Amount val = Rules::get().get_Emission(m_Height);
-		if (val)
+		if (subsidy)
 		{
-			pOutp.reset(new Output);
-			pOutp->m_Coinbase = true;
-			pOutp->Create(m_Height, sk, m_Coin, CoinID(val, m_Height, Key::Type::Coinbase, m_SubIdx), m_Tag);
+			pSubsidy.reset(new Output);
+			pSubsidy->m_Coinbase = true;
+			pSubsidy->Create(m_Height, sk, m_Coin, CoinID(subsidy, m_Height, Key::Type::Coinbase, m_SubIdx), m_Tag);
+			m_Offset += sk;
+		}
 
+		if (fees)
+		{
+			pFees.reset(new Output);
+			pFees->Create(m_Height, sk, m_Coin, CoinID(fees, m_Height, Key::Type::Comission, m_SubIdx), m_Tag);
 			m_Offset += sk;
 		}
 
@@ -3667,37 +3688,18 @@ namespace beam
 		m_Offset += sk;
 	}
 
-	void Block::Builder::AddCoinbaseAndKrn()
+	void Block::Builder::AddCoinbaseAndKrn(Amount fees)
 	{
-		Output::Ptr pOutp;
+		Output::Ptr pSubsidy, pFees;
 		TxKernel::Ptr pKrn;
-		AddCoinbaseAndKrn(pOutp, pKrn);
+		AddCoinbaseAndKrn(fees, pSubsidy, pFees, pKrn);
 
-		if (pOutp)
-			m_Txv.m_vOutputs.push_back(std::move(pOutp));
+		if (pSubsidy)
+			m_Txv.m_vOutputs.push_back(std::move(pSubsidy));
+		if (pFees)
+			m_Txv.m_vOutputs.push_back(std::move(pFees));
 		if (pKrn)
 			m_Txv.m_vKernels.push_back(std::move(pKrn));
-	}
-
-	void Block::Builder::AddFees(Amount fees, Output::Ptr& pOutp)
-	{
-		ECC::Scalar::Native sk;
-
-		pOutp.reset(new Output);
-		pOutp->Create(m_Height, sk, m_Coin, CoinID(fees, m_Height, Key::Type::Comission, m_SubIdx), m_Tag);
-
-		m_Offset += sk;
-	}
-
-	void Block::Builder::AddFees(Amount fees)
-	{
-		if (fees)
-		{
-			Output::Ptr pOutp;
-			AddFees(fees, pOutp);
-
-			m_Txv.m_vOutputs.push_back(std::move(pOutp));
-		}
 	}
 
 	std::ostream& operator << (std::ostream& s, const HeightHash& id)

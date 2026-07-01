@@ -121,7 +121,8 @@ namespace beam::wallet
         outp.Prepare(o1, m_Height.m_Min);
         Oracle o2(o1);
 
-        if (!proof.CoSign(m_SeedSk.V, m_Sk, cp, o1, RangeProof::Confidential::Phase::Step2))
+        uint32_t iVersion = Rules::get().get_BpScheme(m_Height.m_Min);
+        if (!proof.CoSign(m_SeedSk.V, m_Sk, cp, iVersion, o1, RangeProof::Confidential::Phase::Step2))
             throw TransactionFailedException(true, TxFailureReason::FailedToCreateMultiSig);
 
         if (m_IsSender)
@@ -129,7 +130,7 @@ namespace beam::wallet
             // complete proof: 
             GetParameterStrict(TxParameterID::PeerSharedBulletProofPart3, proof.m_Part3);
 
-            if (!proof.CoSign(m_SeedSk.V, m_Sk, cp, o2, RangeProof::Confidential::Phase::Finalize))
+            if (!proof.CoSign(m_SeedSk.V, m_Sk, cp, iVersion, o2, RangeProof::Confidential::Phase::Finalize))
                 throw TransactionFailedException(true, TxFailureReason::FailedToCreateMultiSig);
         }
         else

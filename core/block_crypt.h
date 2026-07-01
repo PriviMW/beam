@@ -597,6 +597,11 @@ namespace beam
 				Exc::Fail("CA disabled");
 		}
 
+		uint32_t get_BpScheme(Height h) const
+		{
+			return IsPastFork_<6>(h) ? 1 : 0;
+		}
+
 		void TestEnabledShielded() const
 		{
 			if (!Shielded.Enabled)
@@ -1146,6 +1151,7 @@ namespace beam
 #define THE_MACRO(id, name) name = id,
 				BeamKernelsAll(THE_MACRO)
 #undef THE_MACRO
+				count
 			};
 		};
 
@@ -1525,6 +1531,12 @@ namespace beam
 	{
 		class Context;
 		static int CmpInOut(const Input&, const Output&);
+
+		enum class Kind {
+			Tx,
+			Block,
+			SparseBlock,
+		};
 
 		struct IReader
 		{
@@ -1972,10 +1984,8 @@ namespace beam
 
 			Builder(Key::Index, Key::IKdf& coin, Key::IPKdf& tag, Height);
 
-			void AddCoinbaseAndKrn();
-			void AddCoinbaseAndKrn(Output::Ptr&, TxKernel::Ptr&);
-			void AddFees(Amount fees);
-			void AddFees(Amount fees, Output::Ptr&);
+			void AddCoinbaseAndKrn(Amount fees);
+			void AddCoinbaseAndKrn(Amount fees, Output::Ptr&, Output::Ptr&, TxKernel::Ptr&);
 		};
 	};
 
@@ -2026,8 +2036,7 @@ namespace beam
 
 		struct Params
 		{
-			bool m_bAllowUnsignedOutputs; // allow outputs without signature (commitment only). Applicable for cut-through blocks only, outputs that are supposed to be consumed in the later block.
-			bool m_bBlock; // block or tx?
+			TxBase::Kind m_Kind;
 
 			// for multi-tasking, parallel verification
 			uint32_t m_nVerifiers;

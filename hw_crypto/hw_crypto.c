@@ -1870,7 +1870,7 @@ typedef struct
 } RangeProof_Recovery_Context;
 
 __stack_hungry__
-static void RangeProof_Recover_Init(const RangeProof_Packed* pRangeproof, Oracle* pOracle, RangeProof_Recovery_Context* pCtx, RangeProof_Repacked* pRep)
+static void RangeProof_Recover_Init(const RangeProof_Packed* pRangeproof, Oracle* pOracle, RangeProof_Recovery_Context* pCtx, RangeProof_Repacked* pRep, uint8_t iVersion)
 {
 	// oracle << p1.A << p1.S
 	// oracle >> y, z
@@ -1894,14 +1894,19 @@ static void RangeProof_Recover_Init(const RangeProof_Packed* pRangeproof, Oracle
 
 	for (uint32_t iCycle = 0; iCycle < _countof(pRangeproof->m_pLRx); iCycle++)
 	{
-		Oracle_NextScalar(pOracle, pRep->m_pE[0] + iCycle); // challenge
-		wrap_scalar_inverse(pRep->m_pE[1] + iCycle, pRep->m_pE[0] + iCycle);
+		if (!iVersion)
+			Oracle_NextScalar(pOracle, pRep->m_pE[0] + iCycle);
 
 		for (uint32_t j = 0; j < 2; j++)
 		{
 			uint32_t iBit = (iCycle << 1) + j;
 			secp256k1_sha256_write_CompactPointEx(&pOracle->m_sha, pRangeproof->m_pLRx[iCycle] + j, pRangeproof->m_pYs[iBit >> 3] >> (7 & iBit));
 		}
+
+		if (iVersion)
+			Oracle_NextScalar(pOracle, pRep->m_pE[0] + iCycle);
+
+		wrap_scalar_inverse(pRep->m_pE[1] + iCycle, pRep->m_pE[0] + iCycle);
 	}
 
 	int overflow;
@@ -4328,7 +4333,7 @@ __stack_hungry__
 void TxSendShielded_PrepareRangeProofRepack(TxSendShieldedContext* pCtx, TxSendShieldedRecoveryParams* pRp, Oracle* pOracle)
 {
 	RangeProof_Repacked rep;
-	RangeProof_Recover_Init(&pCtx->m_pSh->m_RangeProof, pOracle, &pRp->u.m_RCtx, &rep);
+	RangeProof_Recover_Init(&pCtx->m_pSh->m_RangeProof, pOracle, &pRp->u.m_RCtx, &rep, pCtx->m_pIn->m_iVersion);
 
 	// Before we repack (i.e. overwrite the original RangeProof) - finalyze the krnID
 	secp256k1_sha256_initialize(&pOracle->m_sha);

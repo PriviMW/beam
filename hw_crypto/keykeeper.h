@@ -235,7 +235,7 @@ void KeyKeeper_GetPKdf(const KeyKeeper*, KdfPub*, const uint32_t* pChild); // if
 //////////////////
 // Protocol
 #define BeamCrypto_Signature "BeamHW"
-#define BeamCrypto_CurrentVersion 4
+#define BeamCrypto_CurrentVersion 5
 
 #define BeamCrypto_ProtoRequest_Version(macro)
 #define BeamCrypto_ProtoResponse_Version(macro) \
@@ -386,6 +386,7 @@ void KeyKeeper_GetPKdf(const KeyKeeper*, KdfPub*, const uint32_t* pChild); // if
 	macro(CompactPoint, ptAssetGen) \
 	macro(uint8_t, UsePublicGen) \
 	macro(uint8_t, HideAssetAlways) /* important to specify, this affects expected blinding factor recovery */ \
+	macro(uint8_t, iVersion) \
 
 #define BeamCrypto_ProtoResponse_TxSendShielded(macro) \
 	macro(TxCommonOut, Tx) \

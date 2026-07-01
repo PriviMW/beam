@@ -7,7 +7,6 @@ set(VERSION_REVISION 0)
 set(GIT_COMMIT_HASH "unknown")
 
 if(IOS)
-    add_compile_definitions(_LIBCPP_ENABLE_CXX17_REMOVED_AUTO_PTR)
     add_compile_definitions(__IOS__)
 
     if (POLICY CMP0025)
@@ -230,8 +229,9 @@ if(MSVC)
     SET(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO "${CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO} /OPT:REF /INCREMENTAL:NO")
     SET(CMAKE_EXE_LINKER_FLAGS_MINSIZEREL "${CMAKE_EXE_LINKER_FLAGS_MINSIZEREL} /OPT:REF /INCREMENTAL:NO")
 
-    target_compile_definitions(beam INTERFACE -D_WIN32_WINNT=0x0600)
-    add_definitions(-D_WIN32_WINNT=0x0600)
+    # >= Windows 8
+    target_compile_definitions(beam INTERFACE -D_WIN32_WINNT=0x0602)
+    add_definitions(-D_WIN32_WINNT=0x0602)
 
     if(BEAM_USE_STATIC_RUNTIME)
         #target_compile_options(beam INTERFACE $<IF:$<CONFIG:Debug>,/MTd, /MT>)
@@ -295,16 +295,8 @@ else()
             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unqualified-std-cast-call") # osx 13.3 clang 14 3rdparty/libbitcoin
             set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-but-set-variable") # osx 13.3 clang 14 core/merkle.cpp
         endif()
-        if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 15 OR CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 15)
-            add_compile_definitions(_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION) #boost@1.76/1.76.0_4/include/boost/container_hash/hash.hpp:131:33
-        endif()
-        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-enum-constexpr-conversion -Wno-error=enum-constexpr-conversion")
-    endif()
-    # Temporal solution
-    if(ANDROID AND CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER 15 OR CMAKE_CXX_COMPILER_VERSION VERSION_EQUAL 15)
-            add_compile_definitions(_LIBCPP_ENABLE_CXX17_REMOVED_UNARY_BINARY_FUNCTION) #boost@1.76/1.76.0_4/include/boost/container_hash/hash.hpp:131:33
-        endif()
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-enum-constexpr-conversion -Wno-error=enum-constexpr-conversion -Wno-vla-cxx-extension")
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-deprecated-literal-operator") # newer clang vs old 3rdparty/nlohmann json.hpp operator "" _json
     endif()
 endif()
 
@@ -321,7 +313,11 @@ endif()
 
 #Boost
 if (NOT EMSCRIPTEN)
-    set(BEAM_BOOST_COMPONENTS system filesystem program_options thread regex log locale date_time context coroutine)
+    # boost::asio::spawn used Boost.Coroutine until Boost 1.86;
+    # since Boost 1.87 it works only with Boost.Context fibers.
+    # Always include coroutine in find_package so the library is found;
+    # downstream targets conditionally link it based on Boost_VERSION.
+    set(BEAM_BOOST_COMPONENTS filesystem program_options thread regex log locale date_time context coroutine)
 endif()
 function(CreateBoostComponentTargets listOfComponents root libPrefix libSuffix)
     add_library(Boost::boost INTERFACE IMPORTED)
@@ -356,9 +352,7 @@ if(IOS)
     set(BEAM_WALLET_CLIENT_LIBRARY TRUE)
     set(BEAM_TESTS_ENABLED FALSE)
     set(BEAM_ATOMIC_SWAP_SUPPORT OFF)
-    set(BEAM_ASSET_SWAP_SUPPORT OFF)
     set(BEAM_LASER_SUPPORT OFF)
-    add_compile_definitions(BOOST_NO_AUTO_PTR)
     add_compile_definitions(BOOST_ERROR_CODE_HEADER_ONLY)
     CreateBoostComponentTargets("${BEAM_BOOST_COMPONENTS}" "$ENV{BOOST_ROOT_IOS}" "lib/libboost_" ".a")
 elseif(ANDROID)
@@ -371,7 +365,6 @@ elseif(ANDROID)
     add_compile_definitions(BOOST_ERROR_CODE_HEADER_ONLY)
 
     set(ANDROID_SUFFIX "")
-
     if(ANDROID_ABI STREQUAL "armeabi-v7a")
         set(ANDROID_SUFFIX "-clang-mt-a32-1_68.a")
     elseif(ANDROID_ABI STREQUAL "x86")
@@ -382,16 +375,9 @@ elseif(ANDROID)
         set(ANDROID_SUFFIX "-clang-mt-a64-1_68.a")
     endif()
 
-    CreateBoostComponentTargets("${BEAM_BOOST_COMPONENTS}" "$ENV{BOOST_ROOT_ANDROID}" "libs/${ANDROID_ABI}/libboost_" "${ANDROID_SUFFIX}")   
+    CreateBoostComponentTargets("${BEAM_BOOST_COMPONENTS}" "$ENV{BOOST_ROOT_ANDROID}" "libs/${ANDROID_ABI}/libboost_" "${ANDROID_SUFFIX}")
 else()
 
-    if(LINUX)
-        target_compile_definitions(beam INTERFACE
-            -DBOOST_NO_CXX11_SCOPED_ENUMS
-            -DBOOST_NO_AUTO_PTR)
-        add_definitions(-DBOOST_NO_CXX11_SCOPED_ENUMS)
-        add_definitions(-DBOOST_NO_AUTO_PTR)
-    endif()
 
     if (WIN32)
         target_compile_definitions(beam INTERFACE -DNOMINMAX)
@@ -411,9 +397,9 @@ else()
 
     #set (Boost_VERBOSE TRUE)
     if(NOT EMSCRIPTEN)
-        find_package(Boost 1.66 REQUIRED COMPONENTS ${BEAM_BOOST_COMPONENTS})
+        find_package(Boost 1.83 REQUIRED COMPONENTS ${BEAM_BOOST_COMPONENTS})
     else()
-        find_package(Boost 1.66)
+        find_package(Boost 1.83)
     endif()
 endif()
 

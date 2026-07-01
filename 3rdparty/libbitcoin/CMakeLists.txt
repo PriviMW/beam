@@ -15,11 +15,9 @@ add_library(${TARGET_NAME} STATIC
     $<TARGET_OBJECTS:libbitcoin_chain>
 	$<TARGET_OBJECTS:libbitcoin_config>
 	$<TARGET_OBJECTS:libbitcoin_formats>
-	$<TARGET_OBJECTS:libbitcoin_log>
 	$<TARGET_OBJECTS:libbitcoin_machine>
 	$<TARGET_OBJECTS:libbitcoin_math>
 	$<TARGET_OBJECTS:libbitcoin_message>
-	$<TARGET_OBJECTS:libbitcoin_unicode>
 	$<TARGET_OBJECTS:libbitcoin_utility>
 	$<TARGET_OBJECTS:libbitcoin_wallet>)
 
@@ -37,18 +35,16 @@ if(IOS)
             $ENV{BOOST_ROOT_IOS}/lib/libboost_log.a)
 elseif(ANDROID)
     target_link_libraries(${TARGET_NAME} 
-            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_program_options${ANDROID_SUFFIX} 
-            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_filesystem${ANDROID_SUFFIX}
-            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_system${ANDROID_SUFFIX}
-            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_thread${ANDROID_SUFFIX}
-            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_regex${ANDROID_SUFFIX}
-            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_log${ANDROID_SUFFIX}
+            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_program_options.a
+            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_filesystem.a
+            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_thread.a
+            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_regex.a
+            $ENV{BOOST_ROOT_ANDROID}/libs/${ANDROID_ABI}/libboost_log.a
 )
 endif()
 
 target_link_libraries(${TARGET_NAME}
     Boost::boost 
-    Boost::system 
     Boost::thread 
     Boost::regex 
     Boost::filesystem 

@@ -57,7 +57,7 @@ namespace beam
 			return false;
 
 		Prepare(oracle, hScheme);
-		return m_RangeProof.IsValid(comm, oracle, &hGen);
+		return m_RangeProof.IsValid(comm, Rules::get().get_BpScheme(hScheme), oracle, &hGen);
 	}
 
 	ShieldedTxo& ShieldedTxo::operator = (const ShieldedTxo& v)
@@ -420,7 +420,7 @@ namespace beam
 		txo.Prepare(oracle, hScheme);
 		get_Seed(cp.m_Seed.V, hvShared, oracle);
 
-		txo.m_RangeProof.CoSign(cp.m_Seed.V, skSign, cp, oracle, ECC::RangeProof::Confidential::Phase::SinglePass, &g.m_hGen);
+		txo.m_RangeProof.CoSign(cp.m_Seed.V, skSign, cp, Rules::get().get_BpScheme(hScheme), oracle, ECC::RangeProof::Confidential::Phase::SinglePass, &g.m_hGen);
 	}
 
 	bool ShieldedTxo::Data::OutputParams::Recover(const ShieldedTxo& txo, const ECC::Hash::Value& hvShared, Height hScheme, ECC::Oracle& oracle)
@@ -440,7 +440,7 @@ namespace beam
 		cp.m_Blob.p = &p;
 		cp.m_Blob.n = sizeof(p);
 
-		if (!txo.m_RangeProof.Recover(oracle, cp))
+		if (!txo.m_RangeProof.Recover(Rules::get().get_BpScheme(hScheme), oracle, cp))
 			return false;
 
 		m_Value = cp.m_Value;

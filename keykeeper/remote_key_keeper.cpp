@@ -1481,6 +1481,7 @@ namespace beam::wallet
                 ZeroObject(sop.u);
 
                 msg.m_UsePublicGen = !m_M.m_pVoucher;
+                msg.m_iVersion = (uint8_t) Rules::get().get_BpScheme(msg.m_Tx.m_Krn.m_hMin);
 
                 ShieldedTxo::Voucher voucherInst;
                 auto& voucher = m_M.m_pVoucher ? *m_M.m_pVoucher : voucherInst;

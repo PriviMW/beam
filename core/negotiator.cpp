@@ -280,7 +280,8 @@ uint32_t Multisig::Update2()
 	bp.m_Part2 = p2;
 
 	o2 = oracle;
-	if (!bp.CoSign(nonces, sk, cp, o2, ECC::RangeProof::Confidential::Phase::Step2, &wrk.m_hGen))
+	auto iVersion = Rules::get().get_BpScheme(hScheme);
+	if (!bp.CoSign(nonces, sk, cp, iVersion, o2, ECC::RangeProof::Confidential::Phase::Step2, &wrk.m_hGen))
 		return Status::Error;
 
 	uint32_t nShareRes = 0;
@@ -306,7 +307,7 @@ uint32_t Multisig::Update2()
 	}
 
 	o2 = oracle;
-	if (!bp.CoSign(nonces, sk, cp, o2, ECC::RangeProof::Confidential::Phase::Finalize))
+	if (!bp.CoSign(nonces, sk, cp, iVersion, o2, ECC::RangeProof::Confidential::Phase::Finalize))
 		return Status::Error;
 
 
