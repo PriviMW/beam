@@ -31,9 +31,7 @@ jobs:
         abi: [arm64-v8a]
         include:
           - abi: arm64-v8a
-            ndk_triple: aarch64-linux-android
-            boost_tag: a64
-            ctx_asm_arch: arm64
+            ndk_triple: aarch64-linux-android21
 
     steps:
       - uses: actions/checkout@v4
@@ -53,94 +51,51 @@ jobs:
         run: |
           # Unset credential helper to avoid 403 on public repo clones
           git config --global --unset-all http.https://github.com/.extraheader || true
-          git clone --depth=1 https://github.com/BeamMW/boost-android.git ${{runner.workspace}}/dependencies/boost_1_68-android
           git clone --depth=1 https://github.com/BeamMW/openssl-android.git ${{runner.workspace}}/dependencies/Prebuilt-OpenSSL-Android
           echo "ANDROID_NDK_HOME=$ANDROID_NDK_LATEST_HOME" >> $GITHUB_ENV
-          echo "BOOST_ROOT_ANDROID=${{runner.workspace}}/dependencies/boost_1_68-android" >> $GITHUB_ENV
           echo "OPENSSL_ROOT_DIR_ANDROID=${{runner.workspace}}/dependencies/Prebuilt-OpenSSL-Android" >> $GITHUB_ENV
+          # Boost 1.90 is built from source below (mirrors upstream boost_build.yml build_android).
+          # Output layout: $BOOST_ROOT_ANDROID/libs/${abi}/libboost_*.a + $BOOST_ROOT_ANDROID/include/boost/
+          echo "BOOST_ROOT_ANDROID=${{runner.workspace}}/boost_prebuild" >> $GITHUB_ENV
 
-      - name: Build Boost.Context + Boost.Coroutine for Android
+      - name: Download Boost 1.90 source
         run: |
-          BOOST_ROOT="${{env.BOOST_ROOT_ANDROID}}"
-          BOOST_INC="${BOOST_ROOT}/include"
-          BOOST_LIB="${BOOST_ROOT}/libs/${{matrix.abi}}"
-          NDK_BIN="${{env.ANDROID_NDK_HOME}}/toolchains/llvm/prebuilt/linux-x86_64/bin"
-          CC="${NDK_BIN}/${{matrix.ndk_triple}}${{env.ANDROID_SDK_VERSION}}-clang"
-          CXX="${NDK_BIN}/${{matrix.ndk_triple}}${{env.ANDROID_SDK_VERSION}}-clang++"
-          AR="${NDK_BIN}/llvm-ar"
-          SUFFIX="-clang-mt-${{matrix.boost_tag}}-1_68.a"
-          TMPDIR=$(mktemp -d)
+          wget -q https://archives.boost.io/release/1.90.0/source/boost_1_90_0.tar.gz
+          tar -xvf boost_1_90_0.tar.gz > /dev/null
+          mv ./boost_1_90_0 ${{runner.workspace}}/boost
 
-          # Download Boost 1.68 source (context + coroutine only)
-          cd $TMPDIR
-          git clone --depth=1 --branch=boost-1.68.0 https://github.com/boostorg/context.git
-          git clone --depth=1 --branch=boost-1.68.0 https://github.com/boostorg/coroutine.git
+      - name: Bootstrap Boost
+        run: |
+          cd ${{runner.workspace}}/boost
+          ./bootstrap.sh
 
-          CTX_SRC="$TMPDIR/context/src"
-          COR_SRC="$TMPDIR/coroutine/src"
-          OBJDIR="$TMPDIR/obj"
-          mkdir -p $OBJDIR
+      - name: Write Boost user-config.jam
+        run: |
+          NDK=$ANDROID_NDK_LATEST_HOME
+          TOOLCHAIN=$NDK/toolchains/llvm/prebuilt/linux-x86_64
+          mkdir -p ${{runner.workspace}}/boost_prebuild/libs/${{matrix.abi}}
+          cat > ${{runner.workspace}}/boost/user-config.jam <<EOF
+          using clang : android : $TOOLCHAIN/bin/clang++ --target=${{matrix.ndk_triple}} --sysroot=$TOOLCHAIN/sysroot ;
+          EOF
 
-          CXX_FLAGS="-O2 -std=c++14 -fPIC -DANDROID -DNDEBUG \
-            -DBOOST_CONTEXT_SOURCE -DBOOST_COROUTINES_SOURCE \
-            -DBOOST_COROUTINES_NO_DEPRECATION_WARNING \
-            -DBOOST_MPL_CFG_NO_NESTED_VALUE_ARITHMETIC \
-            -Wno-deprecated-declarations \
-            -I${BOOST_INC} \
-            -I$TMPDIR/context/include \
-            -I$TMPDIR/coroutine/include"
+      - name: Build Boost 1.90 for Android
+        run: |
+          cd ${{runner.workspace}}/boost
+          ./b2 toolset=clang-android target-os=android link=static variant=release threading=multi --layout=system \
+            --with-filesystem --with-program_options --with-thread --with-regex --with-log --with-locale \
+            --with-context --with-date_time --with-json --with-container --with-coroutine \
+            --user-config=${{runner.workspace}}/boost/user-config.jam \
+            cxxflags="-fPIC -DBOOST_ASIO_DISABLE_STD_ALIGNED_ALLOC" \
+            cflags="-fPIC" \
+            linkflags="-fPIC" \
+            -j$(nproc)
 
-          # Determine assembly ABI suffix for context asm files
-          if [ "${{matrix.ctx_asm_arch}}" = "arm64" ]; then
-            ASM_ABI="aapcs"
-          elif [ "${{matrix.ctx_asm_arch}}" = "arm" ]; then
-            ASM_ABI="aapcs"
-          elif [ "${{matrix.ctx_asm_arch}}" = "i386" ]; then
-            ASM_ABI="sysv"
-          elif [ "${{matrix.ctx_asm_arch}}" = "x86_64" ]; then
-            ASM_ABI="sysv"
-          fi
-
-          ASM_PREFIX="${CTX_SRC}/asm"
-          ASM_ARCH="${{matrix.ctx_asm_arch}}"
-
-          # Build Boost.Context
-          echo "=== Building Boost.Context for ${{matrix.abi}} ==="
-
-          # Assemble context switching routines
-          $CC -c $CXX_FLAGS \
-            ${ASM_PREFIX}/jump_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
-            -o $OBJDIR/jump.o
-          $CC -c $CXX_FLAGS \
-            ${ASM_PREFIX}/make_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
-            -o $OBJDIR/make.o
-          $CC -c $CXX_FLAGS \
-            ${ASM_PREFIX}/ontop_${ASM_ARCH}_${ASM_ABI}_elf_gas.S \
-            -o $OBJDIR/ontop.o
-
-          # Only stack_traits needed — Boost.Coroutine uses fcontext
-          # assembly directly, not the C++ execution_context class
-          $CXX -c $CXX_FLAGS ${CTX_SRC}/posix/stack_traits.cpp -o $OBJDIR/ctx_stack_traits.o
-
-          $AR rcs ${BOOST_LIB}/libboost_context${SUFFIX} \
-            $OBJDIR/jump.o $OBJDIR/make.o $OBJDIR/ontop.o \
-            $OBJDIR/ctx_stack_traits.o
-
-          echo "Built: ${BOOST_LIB}/libboost_context${SUFFIX}"
-
-          # Build Boost.Coroutine
-          echo "=== Building Boost.Coroutine for ${{matrix.abi}} ==="
-
-          $CXX -c $CXX_FLAGS ${COR_SRC}/exceptions.cpp -o $OBJDIR/cor_exceptions.o
-          $CXX -c $CXX_FLAGS ${COR_SRC}/detail/coroutine_context.cpp -o $OBJDIR/coroutine_context.o
-          $CXX -c $CXX_FLAGS ${COR_SRC}/posix/stack_traits.cpp -o $OBJDIR/cor_stack_traits.o
-
-          $AR rcs ${BOOST_LIB}/libboost_coroutine${SUFFIX} \
-            $OBJDIR/cor_exceptions.o $OBJDIR/coroutine_context.o \
-            $OBJDIR/cor_stack_traits.o
-
-          echo "Built: ${BOOST_LIB}/libboost_coroutine${SUFFIX}"
-          ls -la ${BOOST_LIB}/libboost_co*
+      - name: Collect Boost prebuild
+        run: |
+          cp ${{runner.workspace}}/boost/stage/lib/*.a ${{runner.workspace}}/boost_prebuild/libs/${{matrix.abi}}/
+          cp -R ${{runner.workspace}}/boost/boost ${{runner.workspace}}/boost_prebuild/include
+          echo "=== Built Boost libs ==="
+          ls ${{runner.workspace}}/boost_prebuild/libs/${{matrix.abi}}/
 
       - name: Configure CMake
         run: |
