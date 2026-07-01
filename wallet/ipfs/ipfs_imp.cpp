@@ -275,7 +275,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected add call. IPFS is not started");
                 return;
             }
-            _ios.post([this, data = std::move(data), pin, res = std::move(res), err = std::move(err)]() mutable {
+            boost::asio::post(_ios, [this, data = std::move(data), pin, res = std::move(res), err = std::move(err)]() mutable {
                 BEAM_LOG_INFO() << "IPFS add (Android): posted to ASIO thread, size=" << data.size() << " pin=" << pin;
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->add(&data[0], data.size(), pin, *cancel,
@@ -316,7 +316,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected hash call. IPFS is not started");
                 return;
             }
-            _ios.post([this, data = std::move(data), res = std::move(res), err = std::move(err)]() mutable {
+            boost::asio::post(_ios, [this, data = std::move(data), res = std::move(res), err = std::move(err)]() mutable {
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->calc_cid(&data[0], data.size(), *cancel,
                     std::function<void(boost::system::error_code, std::string)>(
@@ -353,7 +353,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected get call. IPFS is not started");
                 return;
             }
-            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+            boost::asio::post(_ios, [this, hash, res = std::move(res), err = std::move(err)]() mutable {
                 BEAM_LOG_INFO() << "IPFS cat: posted to ASIO thread, calling _node->cat(" << hash << ")";
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->cat(hash, *cancel,
@@ -394,7 +394,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected pin call. IPFS is not started");
                 return;
             }
-            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+            boost::asio::post(_ios, [this, hash, res = std::move(res), err = std::move(err)]() mutable {
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->pin(hash, *cancel,
                     std::function<void(boost::system::error_code)>(
@@ -430,7 +430,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected unpin call. IPFS is not started");
                 return;
             }
-            _ios.post([this, hash, res = std::move(res), err = std::move(err)]() mutable {
+            boost::asio::post(_ios, [this, hash, res = std::move(res), err = std::move(err)]() mutable {
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->unpin(hash, *cancel,
                     std::function<void(boost::system::error_code)>(
@@ -460,7 +460,7 @@ namespace beam::wallet::imp
                 AnyThreaad_retErr(std::move(err), "Unexpected gc call. IPFS is not started");
                 return;
             }
-            _ios.post([this, res = std::move(res), err = std::move(err)]() mutable {
+            boost::asio::post(_ios, [this, res = std::move(res), err = std::move(err)]() mutable {
                 auto cancel = std::make_shared<std::function<void()>>();
                 _node->gc(*cancel,
                     std::function<void(boost::system::error_code)>(
