@@ -1,19 +1,12 @@
 name: Build Android JNI
 
+# Manual dispatch only. The built libwallet-jni.so is pinned into
+# privimw-wallet/app/src/main/jniLibs with a PROVENANCE.json pointing at the
+# exact beam commit + release tag. Auto-rebuilding on every master push would
+# produce a new .so (potentially different hashes) that drifts the pinned
+# provenance, so builds are deliberate: bump the lib, dispatch, then re-pin.
 on:
   workflow_dispatch:
-  push:
-    branches: [master]
-    paths:
-      - 'android/**'
-      - 'wallet/**'
-      - 'bvm/**'
-      - 'core/**'
-      - 'keykeeper/**'
-      - 'utility/**'
-      - 'mnemonic/**'
-      - 'node/**'
-      - '3rdparty/asio-ipfs/**'
 
 env:
   BUILD_TYPE: Release
