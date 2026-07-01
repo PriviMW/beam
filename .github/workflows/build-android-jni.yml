@@ -81,8 +81,11 @@ jobs:
       - name: Build Boost 1.90 for Android
         run: |
           cd ${{runner.workspace}}/boost
+          # Note: --with-locale omitted; Boost.Locale needs iconv/ICU which is not
+          # available on Android, and the Android wallet-jni build does not link
+          # Boost::locale (libbitcoin/atomic-swap is OFF for Android).
           ./b2 toolset=clang-android target-os=android link=static variant=release threading=multi --layout=system \
-            --with-filesystem --with-program_options --with-thread --with-regex --with-log --with-locale \
+            --with-filesystem --with-program_options --with-thread --with-regex --with-log \
             --with-context --with-date_time --with-json --with-container --with-coroutine \
             --user-config=${{runner.workspace}}/boost/user-config.jam \
             cxxflags="-fPIC -DBOOST_ASIO_DISABLE_STD_ALIGNED_ALLOC" \
@@ -93,9 +96,16 @@ jobs:
       - name: Collect Boost prebuild
         run: |
           cp ${{runner.workspace}}/boost/stage/lib/*.a ${{runner.workspace}}/boost_prebuild/libs/${{matrix.abi}}/
+          # Create include/ first so cp -R copies the boost headers INTO it as
+          # include/boost/... (if include/ did not exist, cp would create it as
+          # the boost dir contents, yielding include/intrusive/... and breaking
+          # #include <boost/...> resolution).
+          mkdir -p ${{runner.workspace}}/boost_prebuild/include
           cp -R ${{runner.workspace}}/boost/boost ${{runner.workspace}}/boost_prebuild/include
           echo "=== Built Boost libs ==="
           ls ${{runner.workspace}}/boost_prebuild/libs/${{matrix.abi}}/
+          echo "=== Headers sample ==="
+          ls ${{runner.workspace}}/boost_prebuild/include/boost/intrusive/ | head -3
 
       - name: Configure CMake
         run: |
