@@ -116,7 +116,7 @@ jobs:
             -DANDROID_ABI=${{matrix.abi}} \
             -DBEAM_IPFS_SUPPORT=On \
             -DCMAKE_BUILD_TYPE=${{env.BUILD_TYPE}} \
-            -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator -DBOOST_COROUTINES_NO_DEPRECATION_WARNING" \
+            -DCMAKE_CXX_FLAGS="-Wno-error=deprecated-literal-operator -Wno-deprecated-literal-operator -DBOOST_COROUTINES_NO_DEPRECATION_WARNING -DBOOST_ASIO_DISABLE_STD_ALIGNED_ALLOC" \
             .
 
       - name: Build wallet-jni
