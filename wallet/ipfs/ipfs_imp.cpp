@@ -187,7 +187,22 @@ namespace beam::wallet::imp
                         _handler->AnyThread_onStatus(error, pcnt);
                     };
 
-                    _node = asio_ipfs::node::build(_ios, scb, config, std::move(yield));
+                    _node =
+#ifdef __ANDROID__
+                        // Android: synchronous node construction. node::build<yield_context>
+                        // cannot work on Boost 1.90: build_() stores the completion
+                        // handler in a std::function (CopyConstructible), but Boost 1.90's
+                        // yield completion handler for a unique_ptr result is move-only
+                        // (deleted copy ctor). The add/cat/calc_cid Android bypasses already
+                        // avoid asio coroutines; do the same for node construction via the
+                        // synchronous node() constructor (calls go_asio_ipfs_start_blocking).
+                        // The lifetime _ios_guard + dedicated _thread below keep _ios alive
+                        // for ongoing ops, so this only affects the initial build step.
+                        (void)yield, std::make_unique<asio_ipfs::node>(_ios, scb, config)
+#else
+                        asio_ipfs::node::build(_ios, scb, config, std::move(yield))
+#endif
+                        ;
                     // TODO:IPFS lower connect timeout
                     // TODO:IPFS consider async launch
                     assert(_node);
