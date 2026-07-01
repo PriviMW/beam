@@ -107,6 +107,28 @@ jobs:
           echo "=== Headers sample ==="
           ls ${{runner.workspace}}/boost_prebuild/include/boost/intrusive/ | head -3
 
+      - name: Build Boost.Context fcontext assembly (Android arm64)
+        run: |
+          # b2 cannot select the fcontext asm for android arm64 (it deduces
+          # <abi>sysv <architecture>arm instead of aapcs/arm64), so the b2-built
+          # libboost_context.a ships fcontext.o (which references the symbols)
+          # WITHOUT the jump/make/ontop_fcontext asm definitions -> undefined
+          # symbols at link. Compile the asm manually and add to the archive.
+          CTX_ASM="${{runner.workspace}}/boost/libs/context/src/asm"
+          NDK_BIN="${{env.ANDROID_NDK_HOME}}/toolchains/llvm/prebuilt/linux-x86_64/bin"
+          CC="${NDK_BIN}/${{matrix.ndk_triple}}-clang"
+          AR="${NDK_BIN}/llvm-ar"
+          NM="${NDK_BIN}/llvm-nm"
+          BOOST_LIB="${{env.BOOST_ROOT_ANDROID}}/libs/${{matrix.abi}}"
+          CFLAGS="-O2 -fPIC -DANDROID -DNDEBUG -I${{env.BOOST_ROOT_ANDROID}}/include"
+          set -ex
+          $CC -c $CFLAGS ${CTX_ASM}/jump_arm64_aapcs_elf_gas.S -o /tmp/jump.o
+          $CC -c $CFLAGS ${CTX_ASM}/make_arm64_aapcs_elf_gas.S -o /tmp/make.o
+          $CC -c $CFLAGS ${CTX_ASM}/ontop_arm64_aapcs_elf_gas.S -o /tmp/ontop.o
+          $AR r ${BOOST_LIB}/libboost_context.a /tmp/jump.o /tmp/make.o /tmp/ontop.o
+          echo "=== fcontext symbols now in libboost_context.a ==="
+          $NM ${BOOST_LIB}/libboost_context.a | grep -iE "jump_fcontext|make_fcontext|ontop_fcontext" | head
+
       - name: Configure CMake
         run: |
           export PATH=${{env.ANDROID_NDK_HOME}}:$PATH
