@@ -235,7 +235,7 @@ void KeyKeeper_GetPKdf(const KeyKeeper*, KdfPub*, const uint32_t* pChild); // if
 //////////////////
 // Protocol
 #define BeamCrypto_Signature "BeamHW"
-#define BeamCrypto_CurrentVersion 4
+#define BeamCrypto_CurrentVersion 5
 
 #define BeamCrypto_ProtoRequest_Version(macro)
 #define BeamCrypto_ProtoResponse_Version(macro) \
